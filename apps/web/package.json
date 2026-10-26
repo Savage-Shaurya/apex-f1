@@ -36,16 +36,16 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/typography": "^0.5.20",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.6.5",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/three": "^0.186.0",
-    "autoprefixer": "^10.5.4",
-    "axe-core": "4.11.4",
+    "autoprefixer": "^10.6.1",
+    "axe-core": "4.14.0",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.4.3",
     "playwright": "1.64.1",
-    "postcss": "^8.4.49",
+    "postcss": "^8.5.31",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }

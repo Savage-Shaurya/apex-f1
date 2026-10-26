@@ -37,6 +37,6 @@
     "fast-xml-parser": "^5.10.1"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0"
+    "@types/node": "^26.6.5"
   }
 }
