@@ -22,7 +22,7 @@ const inGit = (() => { try { return execFileSync('git', ['rev-parse', '--show-to
 
 /** Internal material that stays in the private workspace. */
 const PRIVATE_PATHS = [
-  'audit', 'dependency-security-reports',
+  'audit',
   'APEX_F1_PID_PRD.md', 'FORMULA1_STARTUP_PHASE1_PID.md', 'FORMULA1_SYSTEM_DESIGN_PLAN.md', 'APEX_MASTERCLASS.html',
   'a_futuristic_formula_1_pit_lane_at_night_glowing_telemetry_screens_mechanics_in',
   'cinematic_high_speed_motion_blur_of_multiple_formula_1_cars_racing_through_a',
@@ -36,9 +36,12 @@ test('internal design references, strategy, founder and audit material are not i
   const present = PRIVATE_PATHS.filter((relative) => existsSync(path.join(root, relative)));
   assert.deepEqual(present, []);
   // Only product folders and known root files remain at the top level.
-  const allowedRoot = new Set(['.git', '.github', '.gitignore', '.npmrc', '.nvmrc', '.vercelignore', 'CLAUDE.md', 'DEPLOY.md', 'README.md',
+  const allowedRoot = new Set(['.git', '.github', '.gitignore', '.npmrc', '.nvmrc', '.vercel', '.vercelignore', 'CLAUDE.md', 'DEPLOY.md', 'LICENSE', 'README.md',
     'apps', 'docs', 'node_modules', 'package.json', 'packages', 'patches', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'scripts',
-    'tsconfig.base.json', 'turbo.json', 'RELEASE-MANIFEST.json', '.turbo', '.cache', '.DS_Store']);
+    'tsconfig.base.json', 'turbo.json', 'RELEASE-MANIFEST.json', '.turbo', '.cache', '.DS_Store',
+    // Git-ignored output of `pnpm audit:checked`, which CI runs before the tests; the
+    // export and ignore-rule tests below keep it out of the published tree.
+    'dependency-security-reports']);
   const extra = readdirSync(root).filter((name) => !allowedRoot.has(name));
   assert.deepEqual(extra, [], 'unexpected top-level entries');
 });
