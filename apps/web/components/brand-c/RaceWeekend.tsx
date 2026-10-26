@@ -52,7 +52,7 @@ export function RaceWeekend({ data }: { data: BrandCData }) {
         <div className="mt-12 grid gap-6 lg:grid-cols-12">
           <div data-rv className="group relative overflow-hidden rounded-[22px] bg-[color:var(--bc-night)] ring-1 ring-[color:var(--bc-rule)] lg:col-span-7">
             <div aria-hidden className="bc-carbon absolute inset-0 opacity-60" />
-            <div data-px="4" className="relative aspect-[16/12] p-6 sm:aspect-[16/11] sm:p-10">
+            <div className="relative aspect-[16/12] p-6 sm:aspect-[16/11] sm:p-10">
               {n.outline
                 ? <CircuitStreak d={n.outline.d} width={n.outline.width} height={n.outline.height} label={`Outline of ${n.circuitName}`} />
                 : <p className="grid h-full place-items-center text-sm text-[color:var(--bc-titanium)]">Circuit outline unavailable for this layout.</p>}
