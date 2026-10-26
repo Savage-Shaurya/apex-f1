@@ -178,7 +178,10 @@ test("cold shared read consumes admission once, warm process cache consumes none
   assert.deepEqual([reserves, completes, physical], [2, 2, 2]);
 });
 
-test("network failures and cancelled transports keep their dispatch safety lease", async () => {
+// Production 2026-10-26: with three shared dispatch slots, timed-out reads that kept their
+// 35 s lease starved every other read (driver and team pages answered 500). An aborted
+// fetch has closed its connection, and Jolpica's limits count starts (quota and gap).
+test("network failures and timed-out transports release their dispatch lease at once", async () => {
   let completed = 0;
   const sharedAdmission = {
     reserve: async () => ({ admitted: true, retryMs: 0, remainingMs: 35000 }),
@@ -192,17 +195,18 @@ test("network failures and cancelled transports keep their dispatch safety lease
       throw new ProviderError("jolpica", "network");
     }),
   );
-  assert.equal(completed, 0);
+  assert.equal(completed, 1);
   const fresh = new JolpicaRequestControl({ sharedAdmission });
   await assert.rejects(
     fresh.readThrough(
       "fixture",
       0,
       { timeoutMs: 20 },
-      async () => new Promise(() => {}),
+      // Like fetch, the transport rejects once its signal aborts.
+      (signal) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(new ProviderError("jolpica", "timeout")))),
     ),
   );
-  assert.equal(completed, 0);
+  assert.equal(completed, 2);
 });
 
 test("BE-1: a finished failed request (5xx, bad schema) releases its lease, so the next read is not blocked", async () => {

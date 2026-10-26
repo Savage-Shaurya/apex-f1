@@ -53,18 +53,6 @@ export function jolpicaRateLimitScope(key: string): string {
   return "schedule";
 }
 
-/**
- * True when the physical transport is known to have finished, so its shared
- * dispatch lease can be released at once. Timeouts, network errors and
- * aborts may leave a socket settling and keep their bounded lease; a 429
- * keeps it too and additionally pauses every process.
- */
-export function jolpicaTransportFinished(error: unknown): boolean {
-  if (!(error instanceof ProviderError)) return false;
-  if (error.code === "http") return error.status !== 429;
-  return error.code === "invalid-response" || error.code === "incomplete" || error.code === "invalid-input";
-}
-
 function isRateLimited(error: unknown): error is ProviderError {
   return error instanceof ProviderError && (error.code === "rate-limit" || (error.code === "http" && error.status === 429));
 }
@@ -173,7 +161,6 @@ export class JolpicaRequestControl {
       releaseLane = resolve;
     });
     let sharedOwner: string | undefined;
-    let finished = false;
     let rateLimited: ProviderError | undefined;
     try {
       await previous;
@@ -227,13 +214,15 @@ export class JolpicaRequestControl {
       // Only the start gap paces requests. The next queued read may start
       // 260 ms later while this transport is still running.
       releaseLane();
+      const started = this.now();
       try {
         const result = await operation();
-        finished = true;
         return result;
       } catch (error) {
-        finished = jolpicaTransportFinished(error);
         if (isRateLimited(error)) rateLimited = error;
+        // One line per failed physical read, so production logs say why a page lost its data.
+        if (error instanceof ProviderError)
+          console.warn(JSON.stringify({ event: "provider.jolpica.failure", scope, code: error.code, status: error.status ?? null, ms: Math.round(this.now() - started) }));
         throw error;
       }
     } finally {
@@ -245,9 +234,11 @@ export class JolpicaRequestControl {
       const shared = this.config.sharedAdmission;
       if (sharedOwner && shared) {
         try {
-          // A finished transport frees its lease at once, failure or not.
-          // Only transports that may still be settling keep the bounded lease.
-          if (finished && !signal.aborted)
+          // Every ended transport frees its lease at once, failure, timeout or abort: an aborted
+          // fetch has closed its connection, and Jolpica's limits count starts, which the quota
+          // and start gap enforce. Kept leases let three timed-out reads block every other read
+          // for 35 s (production, 2026-10-26). Only a 429 keeps its lease, beside the backoff.
+          if (!rateLimited)
             await completeJolpicaAdmission(shared, sharedOwner);
           if (rateLimited && shared.backoff)
             await withProviderDeadline("jolpica", (backoffSignal) => shared.backoff!(jolpicaRateLimitPauseMs(rateLimited!), backoffSignal, scope), { timeoutMs: 2000 });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { JolpicaRequestControl, jolpicaTransportFinished } from "./request-control";
+import { JolpicaRequestControl } from "./request-control";
 import { ProviderError, retryAfterMs } from "../transport";
 import { jolpicaSeasonKeyMatches } from "./index";
 
@@ -60,12 +60,7 @@ test("D2-RESILIENCE-2: an expired validated copy is served stale when the provid
   await assert.rejects(control.readThrough("standings", 60, {}, async () => { throw new ProviderError("jolpica", "network"); }));
 });
 
-test("transport-finished classification and Retry-After parsing", () => {
-  assert.equal(jolpicaTransportFinished(new ProviderError("jolpica", "http", 500)), true);
-  assert.equal(jolpicaTransportFinished(new ProviderError("jolpica", "http", 429)), false);
-  assert.equal(jolpicaTransportFinished(new ProviderError("jolpica", "timeout")), false);
-  assert.equal(jolpicaTransportFinished(new ProviderError("jolpica", "network")), false);
-  assert.equal(jolpicaTransportFinished(new ProviderError("jolpica", "invalid-response")), true);
+test("Retry-After parsing", () => {
   assert.equal(retryAfterMs("120"), 120_000);
   assert.equal(retryAfterMs("Thu, 01 Jan 2026 00:01:00 GMT", Date.parse("2026-01-01T00:00:00Z")), 60_000);
   assert.equal(retryAfterMs("soon"), undefined);
