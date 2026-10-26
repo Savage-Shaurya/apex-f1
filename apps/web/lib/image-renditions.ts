@@ -90,7 +90,8 @@ function hostRendition(src: string, options: RenditionOptions): Rendition {
     // Probed renditions (2026-10-26): s3 300x200, s2 413x275, s1 600x400, s6 1200x801.
     // A srcSet lets a phone card take the 43-162 KB file instead of the 650 KB one.
     const at = (size: string) => src.replace(/\/s[1-7]\//, `/${size}/`);
-    const srcSet = upgraded === src ? undefined : `${at('s3')} 300w, ${at('s2')} 413w, ${at('s1')} 600w, ${upgraded} 1200w`;
+    // Only a URL without a size bucket has no renditions; one already at s6 still gets the phone sizes.
+    const srcSet = /\/s[1-7]\//.test(src) ? `${at('s3')} 300w, ${at('s2')} 413w, ${at('s1')} 600w, ${upgraded} 1200w` : undefined;
     return { src: upgraded, srcSet, maxWidth: 1200, fallbacks: upgraded === src ? [] : [src] };
   }
 

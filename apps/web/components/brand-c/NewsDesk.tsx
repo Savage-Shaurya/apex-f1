@@ -101,13 +101,14 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
             <SmartImage src={slides[next]!.image} alt="" sizes="100vw" fit="cover" focal="50% 30%" className="absolute inset-0" onFail={() => markFailed(next)} />
           </div>
         )}
-        {/* Scrims keep every word at AA on any photograph: a floor fade below lg, a left and floor wash from lg. */}
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(5_5_6/0.25)_0%,transparent_28%,transparent_62%,var(--bc-night)_100%)] lg:bg-[linear-gradient(90deg,rgb(5_5_6/0.92)_0%,rgb(5_5_6/0.72)_34%,rgb(5_5_6/0.18)_66%,rgb(5_5_6/0.05)_100%)]" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-[55%] bg-[linear-gradient(0deg,var(--bc-night)_0%,rgb(5_5_6/0.82)_32%,transparent_100%)] lg:block" />
+        {/* Scrims keep every word at AA on any photograph: a floor fade below lg. From lg the photo stays
+            bright edge to edge (user, 2026-10-26); only a soft wash sits behind the text block. */}
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(5_5_6/0.25)_0%,transparent_28%,transparent_62%,var(--bc-night)_100%)] lg:bg-[radial-gradient(ellipse_70%_85%_at_0%_72%,rgb(5_5_6/0.78)_0%,rgb(5_5_6/0.5)_45%,transparent_100%)]" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-[30%] bg-[linear-gradient(0deg,var(--bc-night)_0%,rgb(5_5_6/0.6)_40%,transparent_100%)] lg:block" />
       </div>
 
       <div className="ds-container relative z-[2] flex min-w-0 flex-col justify-end pb-8 pt-2 lg:col-start-1 lg:row-start-1 lg:pb-12 lg:pt-28">
-        <div className="max-w-[44rem]">
+        <div className="max-w-[44rem] [text-shadow:0_1px_14px_rgb(5_5_6/0.7)]">
           <h1 id="bc-hero-title" className="bc-label flex flex-wrap items-center gap-x-3 gap-y-1 text-[color:var(--bc-silver)]">
             <span aria-hidden className="h-[2px] w-8 bg-[color:var(--bc-red)]" />
             <span>Latest Formula 1 news</span>
