@@ -60,16 +60,16 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
       ref={root}
       aria-roledescription="carousel"
       aria-labelledby="bc-hero-title"
-      className="relative grid grid-cols-[minmax(0,1fr)] lg:min-h-[clamp(560px,calc(100svh-var(--shell-h,64px)-7.5rem),800px)]"
+      className="relative grid grid-cols-[minmax(0,1fr)] min-h-[clamp(500px,calc(100svh-var(--shell-h,64px)-5rem),760px)] lg:min-h-[clamp(560px,calc(100svh-var(--shell-h,64px)-7.5rem),800px)]"
       // A mouse resting on the desk pauses it; a tap on a touch screen must not leave it paused.
       onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHovered(true); }}
       onPointerLeave={(e) => { if (e.pointerType === 'mouse') setHovered(false); }}
       onFocus={(e) => setFocused((e.target as HTMLElement).matches(':focus-visible'))}
       onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false); }}
     >
-      {/* Picture: a full-width 16:9 frame on phones and tablets (the whole photograph, no side crop);
-          from lg it fills the hero behind the words. */}
-      <div aria-hidden className="relative aspect-[16/9] overflow-hidden bg-[color:var(--bc-carbon)] lg:col-start-1 lg:row-start-1 lg:aspect-auto">
+      {/* Picture: fills the whole hero edge to edge on every screen, with the words over it
+          (user, 2026-10-26). The grid cell grows with the copy, and the photo grows with the cell. */}
+      <div aria-hidden className="relative col-start-1 row-start-1 overflow-hidden bg-[color:var(--bc-carbon)]">
         <AnimatePresence initial={false} mode="sync">
           <m.div
             key={index}
@@ -87,6 +87,7 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
                   eager={index === 0}
                   sizes="100vw"
                   fit="cover"
+                  allowUpscale
                   focal="50% 30%"
                   className="absolute inset-0"
                   onFail={() => markFailed(index)}
@@ -98,16 +99,16 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
         {/* The next picture loads behind the current one, so the crossfade never waits on the network. */}
         {hydrated && count > 1 && !failed.has(next) && (
           <div key={`pre-${next}`} className="pointer-events-none absolute inset-0 opacity-0">
-            <SmartImage src={slides[next]!.image} alt="" sizes="100vw" fit="cover" focal="50% 30%" className="absolute inset-0" onFail={() => markFailed(next)} />
+            <SmartImage src={slides[next]!.image} alt="" sizes="100vw" fit="cover" allowUpscale focal="50% 30%" className="absolute inset-0" onFail={() => markFailed(next)} />
           </div>
         )}
-        {/* Scrims keep every word at AA on any photograph: a floor fade below lg. From lg the photo stays
-            bright edge to edge (user, 2026-10-26); only a soft wash sits behind the text block. */}
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(5_5_6/0.25)_0%,transparent_28%,transparent_62%,var(--bc-night)_100%)] lg:bg-[radial-gradient(ellipse_70%_85%_at_0%_72%,rgb(5_5_6/0.78)_0%,rgb(5_5_6/0.5)_45%,transparent_100%)]" />
+        {/* Scrims keep every word at AA on any photograph. Below lg the copy covers the lower half, so the
+            fade deepens from the middle down; from lg only a soft wash sits behind the text block. */}
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(5_5_6/0.2)_0%,transparent_18%,rgb(5_5_6/0.55)_42%,rgb(5_5_6/0.86)_68%,var(--bc-night)_100%)] lg:bg-[radial-gradient(ellipse_70%_85%_at_0%_72%,rgb(5_5_6/0.78)_0%,rgb(5_5_6/0.5)_45%,transparent_100%)]" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-[30%] bg-[linear-gradient(0deg,var(--bc-night)_0%,rgb(5_5_6/0.6)_40%,transparent_100%)] lg:block" />
       </div>
 
-      <div className="ds-container relative z-[2] flex min-w-0 flex-col justify-end pb-8 pt-2 lg:col-start-1 lg:row-start-1 lg:pb-12 lg:pt-28">
+      <div className="ds-container relative z-[2] col-start-1 row-start-1 flex min-w-0 flex-col justify-end pb-8 pt-28 lg:pb-12">
         <div className="max-w-[44rem] [text-shadow:0_1px_14px_rgb(5_5_6/0.7)]">
           <h1 id="bc-hero-title" className="bc-label flex flex-wrap items-center gap-x-3 gap-y-1 text-[color:var(--bc-silver)]">
             <span aria-hidden className="h-[2px] w-8 bg-[color:var(--bc-red)]" />

@@ -118,3 +118,13 @@ test('stepping wraps around both ends', () => {
   assert.equal(stepSlide(3, 1, 8), 4);
   assert.equal(stepSlide(0, 1, 0), 0);
 });
+
+test('every hero photo fills the full-bleed frame, even on a 2x screen (no scale-down strip at the edge)', async () => {
+  // Publisher photos top out at 1200 px; without allowUpscale SmartImage scales them down on
+  // Retina screens and the striped placeholder shows beside the photo (user, 2026-10-26).
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('./NewsDesk.tsx', import.meta.url), 'utf8');
+  const images = source.match(/<SmartImage\b[\s\S]*?\/>/g) ?? [];
+  assert.ok(images.length >= 2);
+  for (const image of images) assert.match(image, /\ballowUpscale\b/);
+});
