@@ -79,7 +79,7 @@ jobs:
 
       - name: Retain dependency audit evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dependency-audit-evidence
           path: |
@@ -117,7 +117,7 @@ jobs:
 
       - name: Retain quality gate report
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: quality-gate-report
           path: apps/web/tests/quality-gate/.reports/*.json
@@ -127,7 +127,7 @@ jobs:
       # Hand the compiled output to the lighthouse job instead of making it
       # build the app a second time. See that job for why.
       - name: Upload web build
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-build
           # .next/cache is the incremental-build cache: hundreds of MB, useless
