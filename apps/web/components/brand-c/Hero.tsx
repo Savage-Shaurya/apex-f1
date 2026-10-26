@@ -104,7 +104,7 @@ function Podium({ figures, steps, label }: { figures: Placed[]; steps: boolean; 
 /* --------------------------------------------------------- the state bar */
 
 /** What's next, why it matters, where it is: the three answers under the stage. */
-function StateBar({ data }: { data: BrandCData }) {
+export function StateBar({ data }: { data: BrandCData }) {
   const n = data.next;
   const t = data.title;
   const share = t && t.pointsLeft > 0 ? Math.min(1, t.gap / t.pointsLeft) : null;

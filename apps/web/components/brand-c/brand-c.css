@@ -165,3 +165,13 @@
   .bc-kenburns { animation: bc-kb 36s ease-in-out infinite alternate; will-change: transform; }
 }
 @keyframes bc-kb { from { transform: scale(1.03); } to { transform: scale(1.1) translate3d(-1.5%, -1%, 0); } }
+
+/* Home news desk (rotating hero, NewsHero.tsx): the active story's timer bar fills on the
+   compositor and its end advances the slide, so there is no JavaScript timer to drift from it.
+   The picture eases out of a slight zoom. Reduced motion: no timer, no zoom, no auto-advance. */
+.bc-desk-fill { transform-origin: 0 50%; transform: scaleX(1); }
+@keyframes bc-desk-kb { from { transform: scale(1.06); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: no-preference) {
+  .bc-desk-fill[data-run] { animation: bc-progress var(--desk-ms, 6000ms) linear both; }
+  .bc-desk-kb { animation: bc-desk-kb 9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+}
