@@ -23,7 +23,7 @@
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "turbo": "^2.10.9",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "pnpm": {
     "comment": "Overrides patch advisories in TRANSITIVE deps that no direct bump can reach. Every entry below was checked against the installed tree \u2014 an override whose selector does not match anything is dead weight that reads like protection and provides none.",
