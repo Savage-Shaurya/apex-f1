@@ -1,0 +1,231 @@
+name: CI
+
+# Third-party actions are pinned to full commit SHAs, not mutable tags. A tag
+# like @v6 can be repointed by the action's owner (or by anyone who compromises
+# that account) to arbitrary code that then runs with this workflow's token and
+# secrets. The trailing comment records the human-readable version so
+# Dependabot can still offer bumps.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# Least privilege. Without an explicit block the default GITHUB_TOKEN
+# permission set applies, which is broader than anything this workflow needs —
+# it only ever reads the checked-out source.
+permissions:
+  contents: read
+
+# CI uses offline test fixtures and an unconfigured preview build. Keep writable
+# persistence, delivery and paid-provider credentials unavailable to both jobs.
+env:
+  DATABASE_URL: ''
+  DATABASE_WORKER_URL: ''
+  DATABASE_SSL_CA_PATH: ''
+  UPSTASH_REDIS_REST_URL: ''
+  UPSTASH_REDIS_REST_TOKEN: ''
+  CRON_SECRET: ''
+  ADMIN_PASSWORD: ''
+  ADMIN_USERS_JSON: ''
+  ADMIN_LOCAL_DEV_BYPASS: 'false'
+  PREDICTION_COOKIE_SECRET: ''
+  RESEND_API_KEY: ''
+  RESEND_AUDIENCE_ID: ''
+  RESEND_FROM_EMAIL: ''
+  RESEND_FROM_NAME: ''
+  GROQ_API_KEY: ''
+  GROQ_INFERENCE_ENABLED: 'false'
+  NEWSAPI_KEY: ''
+  GUARDIAN_API_KEY: ''
+  NEWSDATA_API_KEY: ''
+  GNEWS_API_KEY: ''
+  CURRENTS_API_KEY: ''
+  OPENMETEO_API_KEY: ''
+  YOUTUBE_API_KEY: ''
+  UNSPLASH_ACCESS_KEY: ''
+  GIPHY_API_KEY: ''
+  GIPHY_SERVER_SEARCH_APPROVED: 'false'
+  HUGGINGFACE_TOKEN: ''
+  HUGGINGFACE_INFERENCE_ENABLED: 'false'
+  OPENF1_ACCESS_TOKEN: ''
+  OPENF1_REALTIME_ENABLED: 'false'
+  POSTHOG_KEY: ''
+  NEXT_PUBLIC_POSTHOG_KEY: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Verify pinned package manager
+        run: test "$(pnpm --version)" = "10.33.0"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Keep production clean and verify any narrowly reviewed development
+      # mitigation against the installed tree; unknown/expired findings fail.
+      - name: Audit dependencies
+        run: pnpm run audit:checked
+
+      - name: Retain dependency audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependency-audit-evidence
+          path: |
+            dependency-security-reports/*.json
+            dependency-security-reports/*.stdout.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Behavior regression tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # Quality gate (docs/QUALITY-GATE.md): forbidden-pattern scan, fake-clock
+      # time tests, the self-test that proves every browser check catches its
+      # bug class on broken fixtures, and a 1440/390 smoke of key routes on the
+      # production build. CI has no provider keys, so pages show their truthful
+      # unavailable states; layout, nav, footer and accessibility still apply.
+      - name: Install Chromium for the quality gate
+        run: pnpm --filter @apex/web exec playwright install --with-deps chromium
+
+      - name: Quality gate (quick)
+        run: |
+          set -euo pipefail
+          pnpm --filter @apex/web start -p 3000 > "$RUNNER_TEMP/next.log" 2>&1 &
+          for _ in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/ && break; sleep 2; done
+          APEX_QA_BASE_URL=http://localhost:3000 pnpm qa:gate:quick
+
+      - name: Retain quality gate report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: quality-gate-report
+          path: apps/web/tests/quality-gate/.reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Hand the compiled output to the lighthouse job instead of making it
+      # build the app a second time. See that job for why.
+      - name: Upload web build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: web-build
+          # .next/cache is the incremental-build cache: hundreds of MB, useless
+          # to the consumer, and this account only has 500 MB of artifact quota.
+          path: |
+            apps/web/.next
+            !apps/web/.next/cache
+          retention-days: 1
+          include-hidden-files: true
+
+  # BE-4: migrations, the guarded security releases, role privileges and the
+  # application's own SQL run against a real disposable PostgreSQL 17 over
+  # verified TLS. Nothing hosted is reachable: the smoke refuses non-loopback
+  # hosts, and the job-level DATABASE_* variables above stay empty.
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Verify pinned package manager
+        run: test "$(pnpm --version)" = "10.33.0"
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Start disposable PostgreSQL 17 with TLS
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/apex-ci-pg"
+          mkdir -p "$dir"
+          openssl req -new -x509 -days 1 -nodes -subj "/CN=localhost" \
+            -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
+            -keyout "$dir/server.key" -out "$dir/server.crt" 2>/dev/null
+          # The image's postgres user (uid 999) must own a 0600 key.
+          sudo chown 999:999 "$dir/server.key" && sudo chmod 600 "$dir/server.key"
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::$password"
+          docker run -d --name apex-ci-pg -p 127.0.0.1:5432:5432 \
+            -e POSTGRES_PASSWORD="$password" -v "$dir:/certs:ro" postgres:17 \
+            -c ssl=on -c ssl_cert_file=/certs/server.crt -c ssl_key_file=/certs/server.key
+          # TCP readiness: the entrypoint's init server listens on the socket only.
+          for _ in $(seq 1 60); do
+            docker exec apex-ci-pg pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1 && break
+            sleep 1
+          done
+          docker exec apex-ci-pg pg_isready -h 127.0.0.1 -U postgres
+          {
+            echo "APEX_CI_PG_ADMIN_URL=postgres://postgres:${password}@127.0.0.1:5432/postgres"
+            echo "APEX_CI_PG_CA_PATH=$dir/server.crt"
+          } >> "$GITHUB_ENV"
+
+      - name: Migrations, security releases and role smoke on real PostgreSQL
+        run: pnpm --dir apps/workers exec tsx ../../packages/db/scripts/ci-database-smoke.mts
+
+  lighthouse:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Verify pinned package manager
+        run: test "$(pnpm --version)" = "10.33.0"
+      - run: pnpm install --frozen-lockfile
+
+      # This job used to run `pnpm --filter @apex/web build` itself, duplicating
+      # work the build job had already done. Two costs: roughly five wasted
+      # runner minutes per run, and a second chance to fail. `next/font/google`
+      # fetches from Google Fonts at build time, so a transient network blip
+      # reddened CI for reasons unrelated to the code — which is exactly what
+      # happened to commit 1a307bf (module-not-found on hanken_grotesk).
+      # Reusing the artifact removes both. lighthouserc.json's
+      # startServerCommand runs `next start`, which only needs .next present.
+      - name: Download web build
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: web-build
+          path: apps/web/.next
+
+      - name: Lighthouse CI
+        uses: treosh/lighthouse-ci-action@3e7e23fb74242897f95c0ba9cabad3d0227b9b18 # v12
+        with:
+          urls: |
+            http://localhost:3000/
+            http://localhost:3000/about
+          # Reports stay in GitHub's private artifact storage. temporaryPublicStorage
+          # was on, which publishes each report to a world-readable URL — it leaks
+          # route structure and page content from a private repo to anyone with the
+          # link, for no benefit when uploadArtifacts already retains them.
+          uploadArtifacts: true
+          temporaryPublicStorage: false
+          configPath: ./.github/lighthouserc.json

@@ -1,0 +1,45 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      production-dependencies:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # eslint 10 cannot be adopted here yet, and this is an upstream block
+      # rather than anything fixable in this repo.
+      #
+      # eslint-config-next 16 depends on eslint-plugin-react ^7.37.0. Its
+      # latest release (7.37.5) declares `eslint: ^3 || ... || ^9.7` and calls
+      # context.getFilename(), which eslint 10 removed. Linting under eslint 10
+      # dies with:
+      #
+      #   TypeError: Error while loading rule 'react/display-name':
+      #   contextOrFilename.getFilename is not a function
+      #
+      # PR #26 was closed for this reason. Without this rule Dependabot simply
+      # reopens it on the next eslint 10.x release, it fails identically, and
+      # the failure notification lands again.
+      #
+      # REMOVE THIS as soon as eslint-plugin-react ships a release whose peer
+      # range admits eslint 10 — the major bump is wanted, just not yet
+      # installable. Minor and patch updates to eslint are unaffected.
+      - dependency-name: 'eslint'
+        update-types:
+          - 'version-update:semver-major'
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

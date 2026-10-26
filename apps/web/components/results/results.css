@@ -1,0 +1,15 @@
+/* Results pages (standings + archive), Carbon & Light. Scoped to .bc. */
+
+/* Round scrubber: the track is drawn by the component (red fill as scaleX), the input keeps the thumb. */
+.bc .bc-range::-webkit-slider-runnable-track { height: 44px; background: transparent; }
+.bc .bc-range::-moz-range-track { height: 44px; background: transparent; }
+.bc .bc-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 20px; height: 20px; margin-top: 12px; border-radius: 999px;
+  background: var(--bc-white); box-shadow: 0 0 0 4px rgb(225 6 0 / 0.35), 0 4px 14px rgb(0 0 0 / 0.6);
+  transition: transform 160ms var(--bc-ease);
+}
+.bc .bc-range::-moz-range-thumb { width: 20px; height: 20px; border: 0; border-radius: 999px; background: var(--bc-white); box-shadow: 0 0 0 4px rgb(225 6 0 / 0.35); }
+.bc .bc-range:active::-webkit-slider-thumb { transform: scale(1.15); }
+.bc .bc-range:focus-visible { outline: 2px solid var(--bc-white); outline-offset: 2px; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { .bc .bc-range::-webkit-slider-thumb { transition: none; } }
+

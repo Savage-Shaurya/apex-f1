@@ -1,0 +1,34 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./*"],
+      "@apex/types": ["../../packages/types/src"],
+      "@apex/ui": ["../../packages/ui/src"],
+      "@apex/ui/tokens": ["../../packages/ui/src/tokens.ts"],
+      "@apex/api-client": ["../../packages/api-client/src"],
+      "@apex/api-client/jolpica": ["../../packages/api-client/src/jolpica"],
+      "@apex/api-client/rss": ["../../packages/api-client/src/rss"],
+      "@apex/api-client/reddit": ["../../packages/api-client/src/reddit"],
+      "@apex/api-client/youtube": ["../../packages/api-client/src/youtube"],
+      "@apex/api-client/openf1": ["../../packages/api-client/src/openf1"],
+      "@apex/api-client/wikidata": ["../../packages/api-client/src/wikidata"],
+      "@apex/api-client/guardian": ["../../packages/api-client/src/guardian"],
+      "@apex/api-client/gnews": ["../../packages/api-client/src/gnews"],
+      "@apex/api-client/openmeteo": ["../../packages/api-client/src/openmeteo"],
+      "@apex/api-client/newsapi": ["../../packages/api-client/src/newsapi"],
+      "@apex/api-client/newsdata": ["../../packages/api-client/src/newsdata"],
+      "@apex/api-client/wikimedia": ["../../packages/api-client/src/wikimedia"],
+      "@apex/api-client/huggingface": ["../../packages/api-client/src/huggingface"],
+      "@apex/api-client/wikipedia": ["../../packages/api-client/src/wikipedia"],
+      "@apex/api-client/currents": ["../../packages/api-client/src/currents"],
+      "@apex/api-client/groq": ["../../packages/api-client/src/groq"]
+    },
+    "noEmit": true,
+    "allowJs": true,
+    "jsx": "preserve"
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", ".next"]
+}

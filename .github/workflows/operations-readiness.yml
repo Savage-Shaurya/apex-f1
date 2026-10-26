@@ -1,0 +1,48 @@
+name: Operations release integrity
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: operations-readiness-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  release-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Verify package manager and frozen dependencies
+        run: |
+          test "$(pnpm --version)" = "10.33.0"
+          pnpm install --frozen-lockfile
+      - name: Exercise export boundaries and scheduler safety
+        run: node --test scripts/ops/ops.test.mjs
+      - name: Check reviewed scheduler sources
+        run: node scripts/ops/release-preflight.mjs --source-only
+      - name: Export clean source twice and verify exact identity
+        run: |
+          node scripts/ops/export-release.mjs "$RUNNER_TEMP/apex-release-a"
+          node scripts/ops/export-release.mjs "$RUNNER_TEMP/apex-release-b"
+          node "$RUNNER_TEMP/apex-release-a/scripts/ops/release-preflight.mjs" --source-only --manifest
+          node -e 'const fs=require("node:fs"); const a=JSON.parse(fs.readFileSync(process.argv[1])); const b=JSON.parse(fs.readFileSync(process.argv[2])); if(a.digest!==b.digest)process.exit(1);' "$RUNNER_TEMP/apex-release-a/RELEASE-MANIFEST.json" "$RUNNER_TEMP/apex-release-b/RELEASE-MANIFEST.json"
+      - name: Retain source manifest
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: clean-release-source-manifest
+          path: ${{ runner.temp }}/apex-release-a/RELEASE-MANIFEST.json
+          if-no-files-found: error
+          retention-days: 14
+# No service/deployment credentials or mutation routes are used. This is source
+# integrity evidence, not hosted execution or provider acceptance.

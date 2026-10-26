@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["icn1"],
+  "crons": [
+    { "path": "/api/cron/jolpica-nightly", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/youtube-sync", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/newsletter-blast", "schedule": "0 6 * * 5" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    }
+  ]
+}

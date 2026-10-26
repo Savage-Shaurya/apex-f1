@@ -1,0 +1,150 @@
+/** Redacted failures: never include credential-bearing URLs or upstream bodies. */
+export class ProviderError extends Error {
+  constructor(
+    readonly provider: string,
+    readonly code: 'http' | 'timeout' | 'network' | 'invalid-response' | 'configuration' | 'incomplete' | 'invalid-input' | 'rate-limit',
+    readonly status?: number,
+    /** Server-requested wait (HTTP Retry-After), when the provider sent one. */
+    readonly retryAfterMs?: number,
+  ) {
+    super(`${provider}: ${code}${status === undefined ? '' : ` (HTTP ${status})`}`);
+    this.name = 'ProviderError';
+  }
+}
+
+/** Parse an HTTP Retry-After header (delta-seconds or HTTP-date), capped at one hour. */
+export function retryAfterMs(value: string | null | undefined, now = Date.now()): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  let ms: number;
+  if (/^\d+$/.test(trimmed)) ms = Number(trimmed) * 1000;
+  else {
+    const at = Date.parse(trimmed);
+    if (!Number.isFinite(at)) return undefined;
+    ms = at - now;
+  }
+  return Number.isFinite(ms) && ms > 0 ? Math.min(ms, 3_600_000) : undefined;
+}
+
+
+/**
+ * The platform fetch, without Next's instrumentation. Next patches
+ * `globalThis.fetch` to add its Data Cache and to mark a render dynamic for
+ * `cache: 'no-store'`. Validated-only providers (Jolpica, the Upstash
+ * admission store) must be neither: an unvalidated body must never be
+ * persisted, and an uncached control request must not turn a statically
+ * prerendered (ISR) page into a per-request render. The page's own
+ * `revalidate` then governs freshness. Outside Next this is plain fetch.
+ */
+export function untrackedFetch(): typeof fetch {
+  const current = globalThis.fetch as typeof fetch & { _nextOriginalFetch?: typeof fetch };
+  return current._nextOriginalFetch ?? current;
+}
+
+export interface ProviderRequestOptions {
+  fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  maxBytes?: number;
+}
+
+/**
+ * Next.js signals static-render bailouts, redirects and not-found with thrown
+ * errors carrying a `digest` (DYNAMIC_SERVER_USAGE, NEXT_REDIRECT,
+ * NEXT_HTTP_ERROR_FALLBACK, BAILOUT_TO_CLIENT_SIDE_RENDERING, ...). They are
+ * control flow, not provider failures: converting one into a ProviderError
+ * turned every prerender into an "unavailable" page and made the whole site
+ * dynamic. This package stays framework-free, so it recognises the shape.
+ */
+export function isFrameworkControlError(error: unknown): boolean {
+  if (error === null || typeof error !== 'object') return false;
+  const digest = (error as { digest?: unknown }).digest;
+  return typeof digest === 'string' && /^(?:DYNAMIC_SERVER_USAGE|NEXT_|BAILOUT_TO_CLIENT_SIDE_RENDERING|HANGING_PROMISE_REJECTION)/.test(digest);
+}
+
+export function failOr<T>(provider: string, error: unknown, strict: boolean | undefined, fallback: T): T {
+  if (isFrameworkControlError(error)) throw error;
+  if (strict) throw error instanceof ProviderError ? error : new ProviderError(provider, 'invalid-response');
+  return fallback;
+}
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export async function readLimitedText(response: Response, maxBytes = 2_000_000, signal?: AbortSignal): Promise<string> {
+  maxBytes = Number.isFinite(maxBytes) ? Math.max(1, Math.min(maxBytes, 16_000_000)) : 2_000_000;
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) throw new ProviderError('response', 'invalid-response');
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const onAbort = () => { void reader.cancel().catch(() => undefined); };
+  signal?.addEventListener('abort', onAbort, { once: true });
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (signal?.aborted) throw new ProviderError('response', 'timeout');
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > maxBytes) throw new ProviderError('response', 'invalid-response');
+      text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+}
+
+/** Deadline covers connection and complete response body, including fetch mocks. */
+export async function withProviderDeadline<T>(
+  provider: string,
+  operation: (signal: AbortSignal) => Promise<T>,
+  options: ProviderRequestOptions = {},
+): Promise<T> {
+  if (options.signal?.aborted) throw new ProviderError(provider, 'timeout');
+  const controller = new AbortController();
+  const duration = options.timeoutMs ?? 8_000;
+  const timeoutMs = Number.isFinite(duration) ? Math.max(1, Math.min(duration, 120_000)) : 8_000;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const interrupted = new Promise<never>((_, reject) => {
+    const fail = () => { controller.abort(); reject(new ProviderError(provider, 'timeout')); };
+    timer = setTimeout(fail, timeoutMs);
+    onAbort = fail;
+    if (options.signal?.aborted) fail();
+    else options.signal?.addEventListener('abort', fail, { once: true });
+  });
+  try {
+    return await Promise.race([operation(controller.signal), interrupted]);
+  } catch (error) {
+    if (isFrameworkControlError(error)) throw error;
+    throw error instanceof ProviderError ? error : new ProviderError(provider, 'network');
+  } finally {
+    clearTimeout(timer);
+    if (onAbort) options.signal?.removeEventListener('abort', onAbort);
+    controller.abort();
+  }
+}
+
+export async function requestJson<T = unknown>(
+  provider: string,
+  url: string | URL,
+  init: RequestInit,
+  options: ProviderRequestOptions = {},
+): Promise<T> {
+  return withProviderDeadline(provider, async (signal) => {
+    const response = await (options.fetchImpl ?? fetch)(url.toString(), { redirect: 'error', ...init, signal });
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
+      throw new ProviderError(provider, 'http', response.status, retryAfterMs(response.headers.get('retry-after')));
+    }
+    const text = await readLimitedText(response, options.maxBytes, signal);
+    try { return JSON.parse(text) as T; }
+    catch { throw new ProviderError(provider, 'invalid-response'); }
+  }, options);
+}

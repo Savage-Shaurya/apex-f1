@@ -1,0 +1,144 @@
+/*
+ * Portrait and stage: the one treatment for every person and car picture
+ * (components/ds/Portrait.tsx, Media kinds headshot and car, CutoutStage).
+ *
+ * A cut-out stands in a lit field instead of on a flat box: the team colour
+ * (data, via --portrait-team) blooms from behind the head into a carbon
+ * ground, a soft key light falls from the top left, a floor shadow sits under
+ * the feet or wheels, and a waist-up crop fades into the floor so the body
+ * never ends on a hard edge. Photographs keep their own ground; a photo that
+ * cannot fill its frame without cropping the subject is matted on the deep
+ * field like a print (never blurred, never cropped to fit).
+ *
+ * Brand-neutral on purpose: every colour and strength is a token below, so a
+ * chosen brand direction restyles all portraits by overriding these.
+ */
+:root {
+  --portrait-field: #19191c;
+  --portrait-field-deep: #0a0a0b;
+  --portrait-team-mix: 46%;
+  --portrait-team-glow: 18%;
+  --portrait-light: rgb(255 255 255 / 0.12);
+  --portrait-floor: rgb(0 0 0 / 0.62);
+  --portrait-edge: rgb(255 255 255 / 0.07);
+  --portrait-ink: rgb(255 255 255 / 0.92);
+  --portrait-ink-2: rgb(255 255 255 / 0.62);
+  --portrait-glare: rgb(255 255 255 / 0.16);
+}
+
+.ds-portrait {
+  --_team: var(--portrait-team, var(--portrait-field));
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  container-type: inline-size;
+  background:
+    radial-gradient(115% 80% at 50% 24%,
+      color-mix(in oklab, var(--_team) var(--portrait-team-mix), var(--portrait-field)) 0%,
+      color-mix(in oklab, var(--_team) var(--portrait-team-glow), var(--portrait-field-deep)) 58%,
+      var(--portrait-field-deep) 100%);
+}
+
+/* Key light and floor shadow: behind the subject. */
+.ds-portrait::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 55% at 26% 6%, var(--portrait-light), transparent 70%),
+    radial-gradient(42% 7% at 50% 98.5%, var(--portrait-floor), transparent 75%);
+}
+
+/* Edge line and grounding fade: above the subject. */
+.ds-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--portrait-edge);
+}
+.ds-portrait[data-framing='bust']::after,
+.ds-portrait[data-framing='head']::after {
+  background: linear-gradient(to top,
+    color-mix(in oklab, var(--_team) 8%, var(--portrait-field-deep)) 0%,
+    color-mix(in oklab, var(--_team) 8%, rgb(10 10 11 / 0)) 24%);
+}
+
+/* Photographs: their own ground, a gentle vignette, no team bloom. */
+.ds-portrait[data-variant='photo'] { background: var(--portrait-field-deep); }
+.ds-portrait[data-variant='photo']::before { display: none; }
+.ds-portrait[data-variant='photo']::after {
+  background: radial-gradient(130% 100% at 50% 30%, transparent 62%, rgb(0 0 0 / 0.28) 100%);
+}
+/* Cars: no box at all. The car stands on the ground it is placed on, with a
+ * contact shadow under the wheels. */
+.ds-portrait[data-variant='car'] { background: transparent; }
+.ds-portrait[data-variant='car']::before {
+  background: radial-gradient(46% 10% at 50% 90%, var(--portrait-floor), transparent 78%);
+}
+.ds-portrait[data-variant='car']::after { box-shadow: none; }
+
+/* No picture: initials set large on the field, honestly labelled. */
+.ds-portrait__monogram {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display, inherit);
+  font-weight: 800;
+  font-size: clamp(1.5rem, 34cqw, 9rem);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--portrait-ink);
+  opacity: 0.9;
+  user-select: none;
+}
+.ds-portrait__monogram[data-outline] {
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 18% 9% 0 0;
+  font-size: clamp(1.5rem, 28cqw, 7rem);
+  color: transparent;
+  -webkit-text-stroke: 1px var(--portrait-ink-2);
+  opacity: 0.5;
+}
+.ds-portrait__label {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 4;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--portrait-ink-2);
+}
+
+/* Glare: a single sheen on hover, adapted from React Bits GlareHover ("sheen")
+ * as a CSS transition so it adds no animation loop. Off under reduced motion. */
+.ds-portrait__glare {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, var(--portrait-glare) 50%, transparent 62%);
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  opacity: 0;
+  transition: background-position 900ms cubic-bezier(0.16, 1, 0.3, 1), opacity 300ms ease;
+}
+:where(a, li, .group, [data-portrait-host]):hover .ds-portrait__glare,
+.ds-portrait:hover .ds-portrait__glare {
+  background-position: -30% 0;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-portrait__glare { display: none; }
+}
+@media (forced-colors: active) {
+  .ds-portrait { background: Canvas; }
+  .ds-portrait::before, .ds-portrait::after, .ds-portrait__glare { display: none; }
+}

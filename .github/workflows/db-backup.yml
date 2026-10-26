@@ -1,0 +1,73 @@
+name: Database backup
+
+# Nightly logical backup of the Apex database (schemas public + drizzle) to the PRIVATE Supabase Storage
+# bucket "apex-backups". Nothing is stored as a GitHub artifact or committed: this repository is public.
+#
+# Repository secrets (Settings > Secrets and variables > Actions > New repository secret):
+#   SUPABASE_BACKUP_DB_URL     owner session-pooler URL, port 5432 (postgresql://apex_owner.<ref>:<pw>@<host>:5432/postgres)
+#   SUPABASE_URL               https://<ref>.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY  service key (Storage API only)
+#   SUPABASE_DB_CA_CERT        optional PEM; when unset the Supabase root CA bundled in packages/db is used
+# Restore and verification steps: scripts/ops/restore-db.md
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # 03:30 UTC nightly
+  workflow_dispatch: {} # manual "Run workflow" button
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Install PostgreSQL 17 client (PGDG)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+      - name: Check required secrets are present (names only)
+        env:
+          SUPABASE_BACKUP_DB_URL: ${{ secrets.SUPABASE_BACKUP_DB_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          missing=0
+          for name in SUPABASE_BACKUP_DB_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name}" ]; then echo "::error::Missing repository secret $name"; missing=1; fi
+          done
+          exit $missing
+      - name: Back up database to private Supabase Storage
+        env:
+          SUPABASE_BACKUP_DB_URL: ${{ secrets.SUPABASE_BACKUP_DB_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_CA_CERT: ${{ secrets.SUPABASE_DB_CA_CERT }}
+          PG_BIN_DIR: /usr/lib/postgresql/17/bin
+        run: |
+          set +x
+          # Mask the password part of the URL as well (GitHub already masks each whole secret).
+          pw="$(node -e 'try{process.stdout.write(decodeURIComponent(new URL(process.env.SUPABASE_BACKUP_DB_URL).password))}catch{}')"
+          if [ -n "$pw" ]; then echo "::add-mask::$pw"; fi
+          unset pw
+          if [ -n "$SUPABASE_DB_CA_CERT" ]; then
+            umask 077
+            printf '%s\n' "$SUPABASE_DB_CA_CERT" > "$RUNNER_TEMP/supabase-ca.crt"
+            export SUPABASE_DB_CA_PATH="$RUNNER_TEMP/supabase-ca.crt"
+          fi
+          unset SUPABASE_DB_CA_CERT
+          node scripts/ops/backup-db.mjs

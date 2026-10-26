@@ -1,0 +1,9 @@
+# Files Vercel does not need to upload for a build of apps/web.
+.claude
+.github
+.turbo
+.next-*
+dist
+docs
+*.md
+extracted_text_from_*

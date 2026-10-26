@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": ".",
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@apex/types": ["./node_modules/@apex/types/src"]
+    }
+  },
+  "include": ["src/**/*", "drizzle.config.ts"]
+}

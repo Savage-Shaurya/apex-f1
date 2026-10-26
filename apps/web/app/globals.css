@@ -1,0 +1,947 @@
+@import 'tailwindcss';
+/* Portrait and stage treatment for every person and car picture (tokens inside). */
+@import '../components/ds/portrait.css';
+@plugin '@tailwindcss/typography';
+
+/* ==========================================================================
+ * APEX design system · "Programme & Timing Sheet"
+ * Direction and rules: the dev-only /design route renders every token and primitive
+ * JS mirror: packages/ui/src/tokens.ts (kept in sync by a test)
+ *
+ *   1. Theme tokens (new system)          5. Motion primitives
+ *   2. Contextual tone tokens             6. Legacy tokens and utilities
+ *   3. Base                               7. Reduced motion, print
+ *   4. Type roles and utilities
+ * ========================================================================== */
+
+/* --------------------------------------------------------------------------
+ * 1. Theme tokens
+ * ------------------------------------------------------------------------ */
+@theme {
+  /* Carbon: the programme's ground and its tone steps. */
+  --color-ground-deep: #050506;
+  --color-ground: #0b0b0c;
+  --color-surface-1: #111113;
+  --color-surface-2: #17171a;
+  --color-surface-3: #1f1f23;
+  --color-surface-4: #2a2a2f;
+
+  /* Ink on carbon. ink-3 is the lowest text value (AA on surface-4). */
+  --color-ink: #f4f4f5;
+  --color-ink-2: #c3c3cb;
+  --color-ink-3: #9e9ea8;
+  --color-ink-faint: #7a7a84; /* non-text only */
+  --color-line: rgb(255 255 255 / 0.09);
+  --color-line-strong: rgb(255 255 255 / 0.18);
+
+  /* Paper: the timing sheet. */
+  --color-paper: #f3f2ee;
+  --color-paper-2: #e7e5df;
+  --color-paper-3: #d9d6ce;
+  --color-paper-ink: #0b0b0c;
+  --color-paper-ink-2: #3f3f46;
+  --color-paper-ink-3: #5c5c64;
+  --color-paper-line: rgb(11 11 12 / 0.12);
+
+  /* Red: surface red (white text 4.97:1) and text reds are separate tokens. */
+  --color-brand-red: #e10600;
+  --color-brand-red-hover: #c80500;
+  --color-brand-red-press: #b80500;
+  --color-red-ink: #ff4d42;
+  --color-red-ink-paper: #b30500;
+
+  /* F1 data semantics. Never decoration. */
+  --color-sector-purple: #c084fc;
+  --color-sector-purple-paper: #7e22ce;
+  --color-sector-green: #34d17a;
+  --color-sector-green-paper: #0e6b35;
+  --color-sector-yellow: #ffd60a;
+  --color-tyre-soft: #ff3b30;
+  --color-tyre-medium: #ffd60a;
+  --color-tyre-hard: #f4f4f5;
+  --color-tyre-inter: #34c759;
+  --color-tyre-wet: #3b82f6;
+  --color-flag-green: #1fbf55;
+  --color-flag-yellow: #ffd60a;
+  --color-flag-red: #e10600;
+  --color-flag-blue: #3b82f6;
+  --color-flag-sc: #ffb020;
+  --color-positive: #34d17a;
+  --color-negative: #ff4d42;
+  --color-caution: #ffb020;
+  --color-info: #5b9dff;
+  --color-podium-gold: #d4af37;
+  --color-podium-silver: #c0c4cc;
+  --color-podium-bronze: #c58a54;
+
+  /* Faces (registered in app/layout.tsx with next/font/local). */
+  --font-display: var(--font-anybody), 'Anybody', 'Hanken Grotesk', system-ui, sans-serif;
+  --font-text: var(--font-hanken), 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-editorial: var(--font-garamond), 'EB Garamond', Georgia, 'Times New Roman', serif;
+  --font-timing: var(--font-jetbrains), 'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+  /* Type scale. Each step carries its own line-height, tracking and weight.
+   * Tracking rule: no step is negative. Capitals at display sizes open
+   * slightly (Heading adds 0 to +0.005em); only sentence-case display above
+   * 48px may close, by at most -0.008em (Heading, from lg/xl up).
+   * Display minimums are sized so a 12-letter word (CHAMPIONSHIP) fits a
+   * 320px phone at display-l and a 9-letter word at display-xl, with the
+   * display face at normal width below 640px (see Heading). */
+  --text-display-xl: clamp(2.25rem, 0.6rem + 9vw, 10rem);
+  --text-display-xl--line-height: 0.92;
+  --text-display-xl--letter-spacing: 0em;
+  --text-display-xl--font-weight: 800;
+  --text-display-l: clamp(2rem, 0.75rem + 5.4vw, 6.5rem);
+  --text-display-l--line-height: 0.95;
+  --text-display-l--letter-spacing: 0em;
+  --text-display-l--font-weight: 800;
+  --text-display-m: clamp(1.75rem, 0.95rem + 3vw, 4rem);
+  --text-display-m--line-height: 1;
+  --text-display-m--letter-spacing: 0em;
+  --text-display-m--font-weight: 800;
+  --text-heading-l: clamp(1.625rem, 1.2rem + 1.4vw, 2.5rem);
+  --text-heading-l--line-height: 1.08;
+  --text-heading-l--letter-spacing: 0em;
+  --text-heading-l--font-weight: 700;
+  --text-heading-m: clamp(1.3125rem, 1.12rem + 0.65vw, 1.75rem);
+  --text-heading-m--line-height: 1.16;
+  --text-heading-m--letter-spacing: 0em;
+  --text-heading-m--font-weight: 700;
+  --text-heading-s: clamp(1.125rem, 1.06rem + 0.28vw, 1.3125rem);
+  --text-heading-s--line-height: 1.26;
+  --text-heading-s--letter-spacing: 0.004em;
+  --text-heading-s--font-weight: 650;
+  --text-lead: clamp(1.1875rem, 1.06rem + 0.55vw, 1.5rem);
+  --text-lead--line-height: 1.42;
+  --text-lead--letter-spacing: 0.004em;
+  --text-body: clamp(1rem, 0.96rem + 0.18vw, 1.125rem);
+  --text-body--line-height: 1.62;
+  --text-body--letter-spacing: 0.01em;
+  --text-ui: 0.9375rem;
+  --text-ui--line-height: 1.3;
+  --text-ui--letter-spacing: 0.012em;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.48;
+  --text-small--letter-spacing: 0.016em;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.45;
+  --text-caption--letter-spacing: 0.02em;
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.3;
+  --text-label--letter-spacing: 0.1em;
+  --text-label--font-weight: 650;
+  --text-label-l: 0.8125rem;
+  --text-label-l--line-height: 1.3;
+  --text-label-l--letter-spacing: 0.08em;
+  --text-label-l--font-weight: 650;
+  --text-stat-xl: clamp(2.75rem, 1.6rem + 3.6vw, 5.5rem);
+  --text-stat-xl--line-height: 0.95;
+  --text-stat-xl--letter-spacing: 0em;
+  --text-stat-xl--font-weight: 800;
+  --text-stat-l: clamp(2rem, 1.5rem + 1.6vw, 3rem);
+  --text-stat-l--line-height: 1;
+  --text-stat-l--letter-spacing: 0em;
+  --text-stat-l--font-weight: 800;
+  --text-stat-m: clamp(1.5rem, 1.3rem + 0.6vw, 1.875rem);
+  --text-stat-m--line-height: 1.05;
+  --text-stat-m--letter-spacing: 0em;
+  --text-stat-m--font-weight: 750;
+
+  /* Tracking utilities. Tailwind's negative defaults are neutralised: no
+   * utility can track text tighter than normal (user decision 2026-10-25). */
+  --tracking-tighter: 0em;
+  --tracking-tight: 0em;
+  --tracking-normal: 0em;
+  --tracking-text: 0.01em;
+  --tracking-wide: 0.02em;
+  --tracking-wider: 0.06em;
+  --tracking-label: 0.1em;
+  --tracking-widest: 0.12em;
+
+  /* Radii: machined, square by default. Chamfers are the one signature cut. */
+  --radius-xs: 2px;
+  --radius-full: 9999px;
+
+  /* Only things that truly float carry a shadow. */
+  --shadow-overlay: 0 28px 64px -16px rgb(0 0 0 / 0.72), 0 0 0 1px rgb(255 255 255 / 0.08);
+  --shadow-float: 0 12px 32px -12px rgb(0 0 0 / 0.6);
+
+  /* Motion curves (mirrored in packages/ui tokens + components/motion/tokens). */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-brake: cubic-bezier(0.2, 0.9, 0.1, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  --breakpoint-xs: 22.5rem; /* 360 */
+  --breakpoint-wide: 87.5rem; /* 1400: header has room for the full next-race chip */
+
+  --animate-marquee: apex-marquee var(--marquee-duration, 48s) linear infinite;
+  --animate-light-pulse: lights-pulse 1.6s var(--ease-in-out) infinite;
+}
+
+/* Phones: paragraph-length notes use the caption size, so it reads at 14px with
+ * a comfortable leading there (responsive audit 2026-10-26, L3). */
+@media (max-width: 639px) {
+  :root { --text-caption: 0.875rem; --text-caption--line-height: 1.5; }
+}
+
+/* Contextual tone tokens: primitives use these so the same component reads
+ * correctly on carbon, a raised surface, the paper timing sheet or red. */
+@theme inline {
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-tone: var(--bg);
+  --color-tone-raised: var(--bg-raised);
+  --color-tone-hover: var(--bg-hover);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-accent: var(--accent-text);
+}
+
+/* --------------------------------------------------------------------------
+ * 2. Tones
+ * ------------------------------------------------------------------------ */
+:root,
+.tone-carbon {
+  --fg: #f4f4f5;
+  --fg-2: #c3c3cb;
+  --fg-3: #9e9ea8;
+  --bg: #0b0b0c;
+  --bg-raised: #111113;
+  --bg-hover: #1f1f23;
+  --rule: rgb(255 255 255 / 0.09);
+  --rule-strong: rgb(255 255 255 / 0.18);
+  /* Edges that mark a form control (checkbox box, field underline): at least 3:1 (WCAG 1.4.11). */
+  --control-edge: rgb(255 255 255 / 0.45);
+  --accent-text: #ff4d42;
+  --focus-ring: #ff4d42;
+}
+.tone-raised {
+  --bg: #111113;
+  --bg-raised: #17171a;
+  --bg-hover: #2a2a2f;
+}
+.tone-deep {
+  --bg: #050506;
+  --bg-raised: #111113;
+  --bg-hover: #1f1f23;
+}
+.tone-paper {
+  --fg: #0b0b0c;
+  --fg-2: #3f3f46;
+  --fg-3: #5c5c64;
+  --bg: #f3f2ee;
+  --bg-raised: #e7e5df;
+  --bg-hover: #d9d6ce;
+  --rule: rgb(11 11 12 / 0.12);
+  --rule-strong: rgb(11 11 12 / 0.28);
+  --control-edge: rgb(11 11 12 / 0.55);
+  --accent-text: #b30500;
+  --focus-ring: #b30500;
+  color-scheme: light;
+}
+.tone-red {
+  --fg: #ffffff;
+  --fg-2: #fff3f2;
+  --fg-3: #fff3f2;
+  --bg: #e10600;
+  --bg-raised: #c80500;
+  --bg-hover: #b80500;
+  --rule: rgb(255 255 255 / 0.28);
+  --rule-strong: rgb(255 255 255 / 0.55);
+  --control-edge: rgb(255 255 255 / 0.9);
+  --accent-text: #ffffff;
+  --focus-ring: #ffffff;
+}
+:is(.tone-carbon, .tone-raised, .tone-deep, .tone-paper, .tone-red) {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+:root {
+  /* Layout */
+  --page-margin: 16px;
+  --container-max: 1680px;
+  --measure: 68ch;
+  --gutter: 16px;
+  --space-section: clamp(4rem, 2rem + 7vw, 10rem);
+  --space-block: clamp(2rem, 1.25rem + 2.6vw, 4rem);
+  --header-h: 64px;
+  /* Header bar plus its 5px progress rail: what fixed chrome covers. */
+  --shell-h: calc(var(--header-h) + 5px);
+  --chamfer-s: 8px;
+  --chamfer-m: 14px;
+  --chamfer-l: 24px;
+  /* Layers */
+  --z-header: 50;
+  --z-consent: 60;
+  --z-overlay: 70;
+  --z-toast: 80;
+  /* Durations */
+  --duration-instant: 100ms;
+  --duration-fast: 160ms;
+  --duration-base: 240ms;
+  --duration-slow: 420ms;
+  --duration-cinematic: 800ms;
+}
+@media (min-width: 40rem) {
+  :root { --page-margin: 24px; --gutter: 20px; }
+}
+@media (min-width: 64rem) {
+  :root { --page-margin: clamp(32px, 3.2vw, 56px); --gutter: 24px; }
+}
+
+/* --------------------------------------------------------------------------
+ * 3. Base
+ * ------------------------------------------------------------------------ */
+html {
+  color-scheme: dark;
+  background-color: #0b0b0c;
+  scrollbar-gutter: stable;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  background-color: #0b0b0c;
+  color: #f4f4f5;
+  font-family: var(--font-text);
+  font-size: clamp(1rem, 0.96rem + 0.18vw, 1.0625rem);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  font-kerning: normal;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+
+::selection {
+  background-color: #e10600;
+  color: #ffffff;
+}
+
+main, section, article, aside, .apex-container, .ds-container { min-width: 0; }
+h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; text-wrap: balance; }
+p, li, figcaption, blockquote { overflow-wrap: break-word; }
+p { text-wrap: pretty; }
+.prose a { overflow-wrap: anywhere; }
+img, video, canvas, svg { max-inline-size: 100%; }
+
+/* Real emphasis uses the real italic, never a synthesised slant. */
+em, i, cite { font-family: var(--font-hanken-italic), var(--font-text); font-style: italic; font-synthesis: none; }
+.font-editorial em, .font-editorial i, .font-editorial cite,
+.ds-editorial em, .ds-editorial i, .ds-editorial cite { font-family: var(--font-garamond-italic), var(--font-editorial); }
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring, #ff4d42);
+  outline-offset: 3px;
+  border-radius: 1px;
+}
+/* Inside anything that scrolls sideways (tab rows, rails, ribbons) an outside
+ * ring is cut by the scroller's overflow, so the ring is drawn just inside the
+ * control there; it can never be clipped (round 3 a11y, R3-A11Y-2). */
+:where([role='tablist'], .overflow-x-auto, .overflow-x-scroll, .snap-x, .ds-focus-inset) :focus-visible,
+.ds-focus-inset:focus-visible { outline-offset: -2px; }
+/* Keyboard focus inside a snapping rail: stop snapping while focus is there so
+ * the browser's scroll-to-focus is not pulled back to the previous card (R3-A11Y-6). */
+.snap-x:has(:focus-visible) { scroll-snap-type: none; }
+
+/* Every interactive control meets the 44px target unless it opts out with
+ * data-compact (dense tables only, where the row carries the target). */
+@layer base {
+  :where(button, [role='button'], input[type='checkbox'], input[type='radio'], select, summary) { cursor: pointer; }
+  :where(button:disabled, [aria-disabled='true']) { cursor: not-allowed; }
+  :where(table) { font-variant-numeric: tabular-nums; }
+}
+
+/* --------------------------------------------------------------------------
+ * 4. Type roles and utilities
+ * ------------------------------------------------------------------------ */
+.font-display { font-family: var(--font-display); }
+.font-headline { font-family: var(--font-display); }
+.font-text, .font-body { font-family: var(--font-text); }
+.font-editorial { font-family: var(--font-editorial); }
+.font-data, .font-timing { font-family: var(--font-timing); }
+
+/* Anybody width axis: 50 (compressed) to 150 (extended). Display type is
+ * set wide; numbers and dense labels sit nearer normal width. */
+@utility font-condensed { font-stretch: 72%; }
+@utility font-normal-width { font-stretch: 100%; }
+@utility font-semi-wide { font-stretch: 112%; }
+@utility font-wide { font-stretch: 122%; }
+@utility font-ultrawide { font-stretch: 150%; }
+.wdth-var { font-variation-settings: 'wdth' var(--wdth, 100); }
+
+.tabular, .tabular-nums { font-variant-numeric: tabular-nums; }
+.lining { font-variant-numeric: lining-nums; }
+.text-balance { text-wrap: balance; }
+.text-pretty { text-wrap: pretty; }
+.measure { max-inline-size: var(--measure); }
+
+/* Optical left alignment for big display letters (A, T, W, O). */
+.optical-left { margin-inline-start: -0.04em; }
+
+/* Uppercase labels: the only place capitals are tracked open. */
+.ds-label {
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  line-height: var(--text-label--line-height);
+  letter-spacing: var(--text-label--letter-spacing);
+  font-weight: 650;
+  text-transform: uppercase;
+}
+
+/* Focus never lands under the fixed shell (WCAG 2.4.11): when Tab or
+ * Shift+Tab scrolls a control into view, the browser keeps it clear of the
+ * header (plus any sticky sub-bar that sets --subbar-h) at the top and of the
+ * open cookie banner (--consent-h, set by ConsentBanner) at the bottom. */
+html {
+  scroll-padding-top: calc(var(--shell-h) + var(--subbar-h, 0px) + 1rem);
+  scroll-padding-bottom: calc(var(--consent-h, 0px) + 1rem);
+}
+
+/* Two sections of the same tone in a row (the home order changes with the
+ * race weekend) are divided by one hairline rule, like pages of a programme. */
+:where(section.tone-carbon + section.tone-carbon, section.tone-raised + section.tone-raised) {
+  box-shadow: inset 0 1px 0 var(--rule);
+}
+
+/* Anchored headings land below the sticky header, not under it. */
+:where(h1, h2, h3, h4, [id]) { scroll-margin-top: calc(var(--shell-h) + 1.5rem); }
+
+/* Negative-tracking guard (site-wide, user decision 2026-10-25: comfortable
+ * letter-spacing everywhere). Any hand-set negative tracking utility, at any
+ * breakpoint, renders at normal tracking. The only negative tracking left on
+ * the site is the ds Heading's sentence-case display step (at most -0.008em,
+ * only above 48px), which carries a text-display-* class and is exempt.
+ * Unlayered on purpose so it beats Tailwind's utilities layer. Guarded by
+ * tests/browser/layout-integrity.test.mjs (computed style in a real browser). */
+:is([class*='tracking-[-'], [class*='tracking-tight'], [class*='tracking-tighter']):not([class*='text-display-']) {
+  letter-spacing: 0em;
+}
+
+/* --------------------------------------------------------------------------
+ * 5. Layout and motion primitives
+ * ------------------------------------------------------------------------ */
+.ds-container {
+  inline-size: 100%;
+  max-inline-size: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--page-margin);
+}
+.ds-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: var(--gutter);
+}
+@media (min-width: 48rem) { .ds-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+@media (min-width: 64rem) { .ds-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
+
+/* Chamfer: the original spec's machined 45-degree cut. Use once per view on a
+ * media frame or key panel, never on every control. */
+.ds-chamfer { clip-path: polygon(0 0, calc(100% - var(--cut, var(--chamfer-m))) 0, 100% var(--cut, var(--chamfer-m)), 100% 100%, 0 100%); }
+.ds-chamfer-bl { clip-path: polygon(0 0, 100% 0, 100% 100%, var(--cut, var(--chamfer-m)) 100%, 0 calc(100% - var(--cut, var(--chamfer-m)))); }
+
+/* Neutral inset outline so photographs never bleed into the ground. */
+.ds-media-outline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+.tone-paper .ds-media-outline::after { box-shadow: inset 0 0 0 1px rgb(11 11 12 / 0.1); }
+
+/* Text-on-photo scrim: neutral, confined to the text edge, never blur. */
+.ds-scrim-bottom { background: linear-gradient(to top, rgb(5 5 6 / 0.92) 0%, rgb(5 5 6 / 0.6) 34%, rgb(5 5 6 / 0) 64%); }
+
+/* Skeleton shimmer: one quiet sweep, off under reduced motion. */
+.ds-skeleton {
+  position: relative;
+  overflow: hidden;
+  /* One step above the surface it sits on (cards are bg-raised). */
+  background-color: var(--bg-hover);
+}
+.ds-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.05) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: apex-shimmer 1.8s var(--ease-in-out) infinite;
+}
+.tone-paper .ds-skeleton::after { background: linear-gradient(90deg, transparent 0%, rgb(11 11 12 / 0.05) 50%, transparent 100%); }
+
+
+/* Light loader: one thin streak of light running a hairline track (transform only).
+   Reduced motion: the streak rests still on the track. */
+.ds-light-track { position: relative; display: block; inline-size: 100%; block-size: 1px; overflow: hidden; background-color: var(--rule-strong); }
+.ds-light-streak { position: absolute; inset-block: 0; inset-inline-start: 0; inline-size: 40%; background: linear-gradient(90deg, transparent, var(--fg) 50%, transparent); transform: translateX(75%); }
+@media (prefers-reduced-motion: no-preference) {
+  .ds-light-streak { transform: translateX(-100%); animation: ds-light-run 1.6s cubic-bezier(0.45, 0, 0.2, 1) infinite; }
+}
+@keyframes ds-light-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+/* Marquee (ported from Magic UI, MIT): CSS-only, paused on hover/focus. */
+@keyframes apex-marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(calc(-100% - var(--marquee-gap, 2rem)), 0, 0); }
+}
+.ds-marquee:hover .ds-marquee-track,
+.ds-marquee:focus-within .ds-marquee-track,
+.ds-marquee[data-paused='true'] .ds-marquee-track,
+.ds-marquee[data-offscreen] .ds-marquee-track { animation-play-state: paused; }
+/* Soft edges: headlines enter and leave through a short fade instead of being cut through a letter.
+ * Keyboard focus drops the mask so a focused headline is never dimmed. */
+.ds-marquee {
+  --marquee-fade: clamp(1.5rem, 4vw, 3.5rem);
+  mask-image: linear-gradient(to right, transparent, #000 var(--marquee-fade), #000 calc(100% - var(--marquee-fade)), transparent);
+}
+.ds-marquee:focus-within { mask-image: none; }
+
+/* ==========================================================================
+ * 6. Legacy tokens and utilities
+ * Consumed by routes built before 2026-10-25. Values are mapped onto the new
+ * palette so every page moves together; remove each block once no route uses it.
+ * ========================================================================== */
+@theme {
+  --color-background: #0b0b0c;
+  --color-surface: #0b0b0c;
+  --color-surface-dim: #0b0b0c;
+  --color-surface-container-lowest: #050506;
+  --color-surface-container-low: #111113;
+  --color-surface-container: #17171a;
+  --color-surface-container-high: #1f1f23;
+  --color-surface-container-highest: #2a2a2f;
+  --color-surface-bright: #36363c;
+  --color-surface-variant: #2a2a2f;
+  --color-surface-tint: #d4d4d8;
+  --color-inverse-surface: #f4f4f5;
+  --color-inverse-on-surface: #17171a;
+
+  --color-telemetry-red: #e10600;
+  --color-telemetry-ink: #ff4d42;
+  --color-red-deep: #9d0400;
+  --color-readable-muted: #c3c3cb;
+  --color-asphalt-gray: #1c1c1f;
+  --color-carbon-black: #0b0b0c;
+  --color-prestige-parchment: #f3f2ee;
+  --color-chalk: #f4f4f5;
+
+  --color-primary: #d4d4d8;
+  --color-primary-container: #0b0b0c;
+  --color-primary-fixed: #f4f4f5;
+  --color-primary-fixed-dim: #d4d4d8;
+  --color-on-primary: #17171a;
+  --color-on-primary-container: #9e9ea8;
+  --color-inverse-primary: #52525b;
+
+  --color-secondary: #ff8a80;
+  --color-secondary-container: #e10600;
+  --color-on-secondary: #5c0200;
+  --color-on-secondary-container: #fff1ef;
+
+  --color-tertiary: #cfcac0;
+  --color-on-tertiary: #2a2a26;
+
+  --color-on-background: #f4f4f5;
+  --color-on-surface: #f4f4f5;
+  --color-on-surface-variant: #c3c3cb;
+  --color-outline: #9e9ea8;
+  --color-outline-variant: #2e2e33;
+
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-on-error: #690005;
+  --color-on-error-container: #ffdad6;
+
+  --font-headline: var(--font-anybody), 'Anybody', 'Hanken Grotesk', system-ui, sans-serif;
+  --font-body: var(--font-hanken), 'Hanken Grotesk', system-ui, sans-serif;
+  --font-data: var(--font-jetbrains), 'JetBrains Mono', 'Menlo', monospace;
+
+  /* Legacy display scale, loosened: leading no longer clips accents and
+   * descenders; tracking is normal at every step. */
+  --text-mega: clamp(3.25rem, 10.5vw, 11.5rem);
+  --text-mega--line-height: 0.9;
+  --text-mega--letter-spacing: 0em;
+  --text-giant: clamp(2.75rem, 7vw, 7.5rem);
+  --text-giant--line-height: 0.92;
+  --text-giant--letter-spacing: 0em;
+  --text-huge: clamp(2.25rem, 4.6vw, 5rem);
+  --text-huge--line-height: 0.96;
+  --text-huge--letter-spacing: 0em;
+  --text-title: clamp(1.75rem, 2.9vw, 3rem);
+  --text-title--line-height: 1.04;
+  --text-title--letter-spacing: 0em;
+
+  --spacing-safe-area: 10vw;
+  --spacing-grid-gutter: 1.5rem;
+  --spacing-stave-gap: 2rem;
+  --spacing-grid-margin: clamp(1rem, 3.2vw, 3.5rem);
+  --spacing-nav: 64px;
+
+  --radius-DEFAULT: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+
+  --ease-cinematic: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-quint: cubic-bezier(0.86, 0, 0.07, 1);
+
+  --animate-lights-pulse: lights-pulse 1.6s var(--ease-in-out-quart) infinite;
+}
+
+:root {
+  --apex-container: 1680px;
+  --apex-side-pad: clamp(1rem, 3.2vw, 3.5rem);
+  --apex-section-gap: clamp(4.5rem, 9vw, 9rem);
+  --apex-gutter: clamp(0.75rem, 1.4vw, 1.5rem);
+  --chamfer: 14px;
+  --nav-h: 64px;
+  --line: rgb(255 255 255 / 0.09);
+  --line-strong: rgb(255 255 255 / 0.18);
+}
+
+@layer utilities {
+  .text-outline,
+  .placeholder\:text-outline::placeholder {
+    color: var(--color-readable-muted);
+  }
+  .text-telemetry-red,
+  .hover\:text-telemetry-red:hover,
+  .focus\:text-telemetry-red:focus,
+  .focus-visible\:text-telemetry-red:focus-visible,
+  .group:hover .group-hover\:text-telemetry-red {
+    color: var(--color-telemetry-ink);
+  }
+  .bg-telemetry-red,
+  .hover\:bg-telemetry-red:hover,
+  .focus\:bg-telemetry-red:focus {
+    color: #ffffff;
+  }
+}
+
+.text-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: 0em;
+  line-height: 0.92;
+}
+.text-headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.text-editorial {
+  font-family: var(--font-editorial);
+  font-weight: 400;
+  line-height: 1.35;
+}
+.text-data {
+  font-family: var(--font-timing);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.text-stroke {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--stroke, rgb(255 255 255 / 0.28));
+}
+
+/* Readability floor (unlayered on purpose: beats arbitrary size/tracking
+ * utilities in older components). Labels never render below 12px,
+ * secondary copy at least 15px, and wide label tracking is pulled in. */
+@layer base {
+  .font-data { font-weight: 500; }
+}
+.text-\[9px\],
+.text-\[9\.5px\],
+.text-\[10px\],
+.text-\[10\.5px\],
+.text-\[11px\],
+.text-xs { font-size: 12px; }
+.text-\[12px\] { font-size: 13px; }
+.text-\[13px\] { font-size: 14px; }
+.text-\[14px\],
+.text-\[14\.5px\],
+.text-sm { font-size: 15px; }
+.text-\[15px\] { font-size: 16px; }
+.text-\[16px\] { font-size: 17px; }
+@media (width >= 48rem) {
+  .md\:text-\[10px\],
+  .md\:text-\[11px\] { font-size: 12.5px; }
+  .md\:text-\[12px\] { font-size: 13px; }
+  .md\:text-\[14px\] { font-size: 15px; }
+  .md\:text-\[15px\] { font-size: 16px; }
+  .md\:text-\[16px\] { font-size: 17px; }
+}
+.tracking-\[0\.3em\] { letter-spacing: 0.16em; }
+.tracking-\[0\.22em\],
+.tracking-\[0\.24em\] { letter-spacing: 0.14em; }
+.tracking-\[0\.2em\] { letter-spacing: 0.12em; }
+.tracking-\[0\.18em\] { letter-spacing: 0.12em; }
+.tracking-\[0\.16em\] { letter-spacing: 0.11em; }
+
+.apex-container {
+  width: 100%;
+  max-width: var(--apex-container);
+  margin-inline: auto;
+  padding-inline: var(--apex-side-pad);
+}
+.section-gap { padding-block: var(--apex-section-gap); }
+
+.hairline-grid {
+  display: grid;
+  gap: 1px;
+  background-color: var(--line);
+}
+.hairline-grid > * { background-color: var(--color-background); }
+
+.chamfer {
+  clip-path: polygon(0 0, calc(100% - var(--chamfer)) 0, 100% var(--chamfer), 100% 100%, 0 100%);
+}
+.chamfer-bl {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, var(--chamfer) 100%, 0 calc(100% - var(--chamfer)));
+}
+.chamfer-both {
+  clip-path: polygon(0 0, calc(100% - var(--chamfer)) 0, 100% var(--chamfer), 100% 100%, var(--chamfer) 100%, 0 calc(100% - var(--chamfer)));
+}
+.chamfer-br, .chamfer-tl { clip-path: none; }
+
+.kerb {
+  height: 10px;
+  background-image: repeating-linear-gradient(-45deg, var(--color-telemetry-red) 0 14px, #f4f4f5 14px 28px);
+}
+.kerb-thin { height: 4px; }
+
+.chequer {
+  --sq: 22px;
+  background-color: #0b0b0c;
+  background-image: conic-gradient(#f4f4f5 25%, transparent 0 50%, #f4f4f5 0 75%, transparent 0);
+  background-size: calc(var(--sq) * 2) calc(var(--sq) * 2);
+}
+
+.timing-rules {
+  background-image: linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 100% 3rem;
+}
+.stave-line-bg {
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+  background-size: 100% 2rem;
+}
+
+.scrim-bottom {
+  background: linear-gradient(to top, rgb(11 11 12 / 0.94) 0%, rgb(11 11 12 / 0.72) 32%, rgb(11 11 12 / 0) 62%);
+}
+.scrim-left {
+  background: linear-gradient(to right, rgb(11 11 12 / 0.88) 0%, rgb(11 11 12 / 0.5) 38%, rgb(11 11 12 / 0) 62%);
+}
+.scrim-card {
+  background: linear-gradient(to top, rgb(11 11 12 / 0.92) 0%, rgb(11 11 12 / 0.55) 40%, rgb(11 11 12 / 0) 70%);
+}
+
+.media-zoom { overflow: hidden; }
+.media-zoom img {
+  transition: transform 900ms var(--ease-out-expo);
+  will-change: transform;
+}
+.group:hover .media-zoom img,
+.group:focus-visible .media-zoom img { transform: scale(1.045); }
+
+.edge-draw { position: relative; }
+.edge-draw::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 2px;
+  background: var(--color-telemetry-red);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 520ms var(--ease-out-expo);
+  z-index: 2;
+}
+.group:hover .edge-draw::before,
+.group:focus-visible .edge-draw::before,
+.edge-draw:hover::before { transform: scaleX(1); }
+
+.link-draw {
+  position: relative;
+  display: inline-block;
+}
+.link-draw::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background-color: var(--color-telemetry-red);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 320ms var(--ease-out-expo);
+}
+.link-draw:hover::after,
+.link-draw:focus-visible::after { transform: scaleX(1); }
+
+.glass-medium,
+.glass-pronounced {
+  background-color: var(--color-background);
+  border-bottom: 1px solid var(--line);
+}
+.glass-panel {
+  background-color: var(--color-surface-container);
+  border: 1px solid var(--line-strong);
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Keyframes */
+@keyframes lights-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+@keyframes apex-shimmer {
+  0% { transform: translateX(-100%); }
+  60%, 100% { transform: translateX(200%); }
+}
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-surface-container-low);
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.045) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: apex-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes apex-stroke-draw {
+  from { stroke-dashoffset: 240; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes apex-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.stroke-draw path {
+  stroke-dasharray: 240;
+  stroke-dashoffset: 240;
+  animation: apex-stroke-draw 1100ms var(--ease-out-expo) 200ms forwards;
+}
+.apex-monogram-idle path[fill]:not([stroke]) { opacity: 1; }
+
+@keyframes apex-fade-up {
+  0% { opacity: 0; transform: translate3d(0, 16px, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes apex-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.progress-run {
+  transform-origin: left;
+  animation: apex-progress var(--dur, 7s) linear forwards;
+}
+.progress-paused { animation-play-state: paused; }
+
+.apex-marquee-container {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2.5rem;
+  white-space: nowrap;
+}
+.apex-marquee,
+.apex-marquee-clone { animation: apex-marquee-scroll 70s linear infinite; }
+.apex-marquee-container:hover .apex-marquee,
+.apex-marquee-container:hover .apex-marquee-clone,
+.apex-marquee-container:focus-within .apex-marquee,
+.apex-marquee-container:focus-within .apex-marquee-clone { animation-play-state: paused; }
+@keyframes apex-marquee-scroll {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-100%, 0, 0); }
+}
+
+@keyframes apex-tower-flash-up {
+  0% { background-color: rgba(52, 209, 122, 0); }
+  20% { background-color: rgba(52, 209, 122, 0.18); }
+  100% { background-color: rgba(52, 209, 122, 0); }
+}
+@keyframes apex-tower-flash-down {
+  0% { background-color: rgba(225, 6, 0, 0); }
+  20% { background-color: rgba(225, 6, 0, 0.22); }
+  100% { background-color: rgba(225, 6, 0, 0); }
+}
+.tower-row[data-flash='up'] { animation: apex-tower-flash-up 1400ms var(--ease-out-expo) forwards; }
+.tower-row[data-flash='down'] { animation: apex-tower-flash-down 1400ms var(--ease-out-expo) forwards; }
+
+/* Page transitions (View Transitions API). */
+@supports (view-transition-name: a) {
+  ::view-transition-old(root) {
+    animation: 420ms var(--ease-in-out-quart) both apex-vt-out;
+  }
+  ::view-transition-new(root) {
+    animation: 620ms var(--ease-out-expo) 120ms both apex-vt-in;
+  }
+  ::view-transition-group(*) {
+    animation-duration: 700ms;
+    animation-timing-function: var(--ease-out-expo);
+  }
+}
+@keyframes apex-vt-out {
+  to { opacity: 0; transform: translate3d(0, -24px, 0); }
+}
+@keyframes apex-vt-in {
+  from { opacity: 0; clip-path: inset(0 0 100% 0); }
+  to { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+
+
+@keyframes apex-circuit-draw { to { stroke-dashoffset: 0; } }
+
+/* Height of the fixed site header (64px bar + 5px rail at every width), for
+ * sticky sub-bars. It drops to 0 while the header hides on scroll down. */
+:root { --nav-offset: var(--shell-h); }
+html[data-nav-hidden='true'] { --nav-offset: 0px; }
+
+/* ==========================================================================
+ * 7. Reduced motion and print
+ * ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .apex-marquee, .apex-marquee-clone, .ds-marquee-track { animation: none !important; transform: none !important; }
+  .apex-marquee-container, .ds-marquee { overflow-x: auto; }
+  .apex-marquee-clone, .ds-marquee-clone { display: none; }
+  /* The static row starts flush left: fade only the trailing edge, as a cue that it scrolls. */
+  .ds-marquee { mask-image: linear-gradient(to right, #000 calc(100% - var(--marquee-fade)), transparent); }
+  .progress-run { animation: none; transform: scaleX(0); }
+  .ds-skeleton::after { display: none; }
+}
+
+@media print {
+  header, footer, nav, aside, [data-shell] { display: none !important; }
+  body { background: #fff; color: #000; }
+}

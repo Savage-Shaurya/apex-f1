@@ -1,0 +1,59 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "globalEnv": [
+    "NODE_ENV",
+    "APEX_NEXT_DIST_DIR",
+    "VERCEL",
+    "VERCEL_ENV",
+    "VERCEL_URL",
+    "VERCEL_PROJECT_PRODUCTION_URL",
+    "NEXT_PUBLIC_SITE_URL",
+    "APEX_STRICT_ENV",
+    "GROQ_API_KEY",
+    "GROQ_INFERENCE_ENABLED",
+    "NEWSAPI_KEY",
+    "GUARDIAN_API_KEY",
+    "NEWSDATA_API_KEY",
+    "GNEWS_API_KEY",
+    "CURRENTS_API_KEY",
+    "OPENMETEO_API_KEY",
+    "YOUTUBE_API_KEY",
+    "HUGGINGFACE_TOKEN",
+    "HUGGINGFACE_INFERENCE_ENABLED",
+    "OPENF1_ACCESS_TOKEN",
+    "OPENF1_REALTIME_ENABLED",
+    "RESEND_API_KEY",
+    "RESEND_AUDIENCE_ID",
+    "RESEND_FROM_EMAIL",
+    "RESEND_FROM_NAME",
+    "CRON_SECRET",
+    "ADMIN_PASSWORD",
+    "PREDICTION_COOKIE_SECRET",
+    "UPSTASH_REDIS_REST_URL",
+    "UPSTASH_REDIS_REST_TOKEN",
+    "DISTRIBUTED_RATE_LIMIT_REQUIRED",
+    "DATABASE_URL",
+    "DATABASE_SSL_CA_PATH",
+    "NEXT_PUBLIC_*"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"]
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

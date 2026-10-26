@@ -1,0 +1,9 @@
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+node_modules/
+.env*.local
+.vercel
+tests/quality-gate/.reports/
+next-env.d.ts

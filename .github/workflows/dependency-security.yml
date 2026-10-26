@@ -1,0 +1,52 @@
+name: Dependency security
+
+# Registry advisories can change while the committed lockfile stays unchanged.
+# This only checks dependencies; it never runs the application or cron routes.
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-security
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Verify pinned package manager
+        run: test "$(pnpm --version)" = "10.33.0"
+
+      # Prevent dependency lifecycle scripts from executing in the audit job.
+      - name: Install exact lockfile without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Audit full and production dependency trees
+        run: pnpm run audit:checked
+
+      - name: Retain dependency audit reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependency-security-reports
+          path: |
+            dependency-security-reports/*.json
+            dependency-security-reports/*.stdout.log
+          if-no-files-found: warn
+          retention-days: 14

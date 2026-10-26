@@ -1,0 +1,8 @@
+/* Race weekend: the light running along an on-track session's segment (transform only). */
+@media (prefers-reduced-motion: no-preference) {
+  .rp-run { animation: rp-run-y 2.4s cubic-bezier(0.45, 0, 0.2, 1) infinite; }
+  @media (min-width: 64rem) { .rp-run { animation-name: rp-run-x; } }
+}
+@media (prefers-reduced-motion: reduce) { .rp-run { display: none; } }
+@keyframes rp-run-y { from { transform: translate3d(0, -100%, 0); } to { transform: translate3d(0, 100%, 0); } }
+@keyframes rp-run-x { from { transform: translate3d(-100%, 0, 0); } to { transform: translate3d(100%, 0, 0); } }

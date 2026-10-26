@@ -1,0 +1,3274 @@
+{
+ "description": "Verbatim position-1 rows of each completed season's final Jolpica standings. Regenerate with scripts/build-championship-snapshot.mjs.",
+ "provider": "Jolpica F1 (Ergast-compatible API)",
+ "generatedAt": "2026-10-25",
+ "through": 2025,
+ "drivers": [
+  {
+   "year": 1950,
+   "round": 7,
+   "source": "https://api.jolpi.ca/ergast/f1/1950/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "30",
+    "wins": "3",
+    "Driver": {
+     "driverId": "farina",
+     "url": "http://en.wikipedia.org/wiki/Nino_Farina",
+     "givenName": "Nino",
+     "familyName": "Farina",
+     "dateOfBirth": "1906-10-30",
+     "nationality": "Italian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "alfa",
+      "url": "https://en.wikipedia.org/wiki/Alfa_Romeo_in_Formula_One",
+      "name": "Alfa Romeo",
+      "nationality": "Swiss"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1951,
+   "round": 8,
+   "source": "https://api.jolpi.ca/ergast/f1/1951/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "31",
+    "wins": "3",
+    "Driver": {
+     "driverId": "fangio",
+     "url": "http://en.wikipedia.org/wiki/Juan_Manuel_Fangio",
+     "givenName": "Juan",
+     "familyName": "Fangio",
+     "dateOfBirth": "1911-06-24",
+     "nationality": "Argentine"
+    },
+    "Constructors": [
+     {
+      "constructorId": "alfa",
+      "url": "https://en.wikipedia.org/wiki/Alfa_Romeo_in_Formula_One",
+      "name": "Alfa Romeo",
+      "nationality": "Swiss"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1952,
+   "round": 8,
+   "source": "https://api.jolpi.ca/ergast/f1/1952/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "36",
+    "wins": "6",
+    "Driver": {
+     "driverId": "ascari",
+     "url": "http://en.wikipedia.org/wiki/Alberto_Ascari",
+     "givenName": "Alberto",
+     "familyName": "Ascari",
+     "dateOfBirth": "1918-07-13",
+     "nationality": "Italian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1953,
+   "round": 9,
+   "source": "https://api.jolpi.ca/ergast/f1/1953/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "34.5",
+    "wins": "5",
+    "Driver": {
+     "driverId": "ascari",
+     "url": "http://en.wikipedia.org/wiki/Alberto_Ascari",
+     "givenName": "Alberto",
+     "familyName": "Ascari",
+     "dateOfBirth": "1918-07-13",
+     "nationality": "Italian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1954,
+   "round": 9,
+   "source": "https://api.jolpi.ca/ergast/f1/1954/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "42",
+    "wins": "6",
+    "Driver": {
+     "driverId": "fangio",
+     "url": "http://en.wikipedia.org/wiki/Juan_Manuel_Fangio",
+     "givenName": "Juan",
+     "familyName": "Fangio",
+     "dateOfBirth": "1911-06-24",
+     "nationality": "Argentine"
+    },
+    "Constructors": [
+     {
+      "constructorId": "maserati",
+      "url": "https://en.wikipedia.org/wiki/Maserati",
+      "name": "Maserati",
+      "nationality": "Italian"
+     },
+     {
+      "constructorId": "mercedes",
+      "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+      "name": "Mercedes",
+      "nationality": "German"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1955,
+   "round": 7,
+   "source": "https://api.jolpi.ca/ergast/f1/1955/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "40",
+    "wins": "4",
+    "Driver": {
+     "driverId": "fangio",
+     "url": "http://en.wikipedia.org/wiki/Juan_Manuel_Fangio",
+     "givenName": "Juan",
+     "familyName": "Fangio",
+     "dateOfBirth": "1911-06-24",
+     "nationality": "Argentine"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mercedes",
+      "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+      "name": "Mercedes",
+      "nationality": "German"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1956,
+   "round": 8,
+   "source": "https://api.jolpi.ca/ergast/f1/1956/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "30",
+    "wins": "3",
+    "Driver": {
+     "driverId": "fangio",
+     "url": "http://en.wikipedia.org/wiki/Juan_Manuel_Fangio",
+     "givenName": "Juan",
+     "familyName": "Fangio",
+     "dateOfBirth": "1911-06-24",
+     "nationality": "Argentine"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1957,
+   "round": 8,
+   "source": "https://api.jolpi.ca/ergast/f1/1957/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "40",
+    "wins": "4",
+    "Driver": {
+     "driverId": "fangio",
+     "url": "http://en.wikipedia.org/wiki/Juan_Manuel_Fangio",
+     "givenName": "Juan",
+     "familyName": "Fangio",
+     "dateOfBirth": "1911-06-24",
+     "nationality": "Argentine"
+    },
+    "Constructors": [
+     {
+      "constructorId": "maserati",
+      "url": "https://en.wikipedia.org/wiki/Maserati",
+      "name": "Maserati",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1958,
+   "round": 11,
+   "source": "https://api.jolpi.ca/ergast/f1/1958/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "42",
+    "wins": "1",
+    "Driver": {
+     "driverId": "hawthorn",
+     "url": "http://en.wikipedia.org/wiki/Mike_Hawthorn",
+     "givenName": "Mike",
+     "familyName": "Hawthorn",
+     "dateOfBirth": "1929-04-10",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1959,
+   "round": 9,
+   "source": "https://api.jolpi.ca/ergast/f1/1959/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "31",
+    "wins": "2",
+    "Driver": {
+     "driverId": "jack_brabham",
+     "url": "http://en.wikipedia.org/wiki/Jack_Brabham",
+     "givenName": "Jack",
+     "familyName": "Brabham",
+     "dateOfBirth": "1926-04-02",
+     "nationality": "Australian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "cooper-climax",
+      "url": "https://en.wikipedia.org/wiki/Cooper_Car_Company",
+      "name": "Cooper-Climax",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1960,
+   "round": 10,
+   "source": "https://api.jolpi.ca/ergast/f1/1960/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "43",
+    "wins": "5",
+    "Driver": {
+     "driverId": "jack_brabham",
+     "url": "http://en.wikipedia.org/wiki/Jack_Brabham",
+     "givenName": "Jack",
+     "familyName": "Brabham",
+     "dateOfBirth": "1926-04-02",
+     "nationality": "Australian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "cooper-climax",
+      "url": "https://en.wikipedia.org/wiki/Cooper_Car_Company",
+      "name": "Cooper-Climax",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1961,
+   "round": 8,
+   "source": "https://api.jolpi.ca/ergast/f1/1961/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "34",
+    "wins": "2",
+    "Driver": {
+     "driverId": "phil_hill",
+     "url": "http://en.wikipedia.org/wiki/Phil_Hill",
+     "givenName": "Phil",
+     "familyName": "Hill",
+     "dateOfBirth": "1927-04-20",
+     "nationality": "American"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1962,
+   "round": 9,
+   "source": "https://api.jolpi.ca/ergast/f1/1962/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "42",
+    "wins": "4",
+    "Driver": {
+     "driverId": "hill",
+     "url": "http://en.wikipedia.org/wiki/Graham_Hill",
+     "givenName": "Graham",
+     "familyName": "Hill",
+     "dateOfBirth": "1929-02-15",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "brm",
+      "url": "https://en.wikipedia.org/wiki/British_Racing_Motors",
+      "name": "BRM",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1963,
+   "round": 10,
+   "source": "https://api.jolpi.ca/ergast/f1/1963/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "54",
+    "wins": "7",
+    "Driver": {
+     "driverId": "clark",
+     "url": "http://en.wikipedia.org/wiki/Jim_Clark",
+     "givenName": "Jim",
+     "familyName": "Clark",
+     "dateOfBirth": "1936-03-04",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "lotus-climax",
+      "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+      "name": "Lotus-Climax",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1964,
+   "round": 10,
+   "source": "https://api.jolpi.ca/ergast/f1/1964/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "40",
+    "wins": "2",
+    "Driver": {
+     "driverId": "surtees",
+     "url": "http://en.wikipedia.org/wiki/John_Surtees",
+     "givenName": "John",
+     "familyName": "Surtees",
+     "dateOfBirth": "1934-02-11",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1965,
+   "round": 10,
+   "source": "https://api.jolpi.ca/ergast/f1/1965/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "54",
+    "wins": "6",
+    "Driver": {
+     "driverId": "clark",
+     "url": "http://en.wikipedia.org/wiki/Jim_Clark",
+     "givenName": "Jim",
+     "familyName": "Clark",
+     "dateOfBirth": "1936-03-04",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "lotus-climax",
+      "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+      "name": "Lotus-Climax",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1966,
+   "round": 9,
+   "source": "https://api.jolpi.ca/ergast/f1/1966/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "42",
+    "wins": "4",
+    "Driver": {
+     "driverId": "jack_brabham",
+     "url": "http://en.wikipedia.org/wiki/Jack_Brabham",
+     "givenName": "Jack",
+     "familyName": "Brabham",
+     "dateOfBirth": "1926-04-02",
+     "nationality": "Australian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "brabham-repco",
+      "url": "https://en.wikipedia.org/wiki/Brabham",
+      "name": "Brabham-Repco",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1967,
+   "round": 11,
+   "source": "https://api.jolpi.ca/ergast/f1/1967/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "51",
+    "wins": "2",
+    "Driver": {
+     "driverId": "hulme",
+     "url": "http://en.wikipedia.org/wiki/Denny_Hulme",
+     "givenName": "Denny",
+     "familyName": "Hulme",
+     "dateOfBirth": "1936-06-18",
+     "nationality": "New Zealander"
+    },
+    "Constructors": [
+     {
+      "constructorId": "brabham-repco",
+      "url": "https://en.wikipedia.org/wiki/Brabham",
+      "name": "Brabham-Repco",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1968,
+   "round": 12,
+   "source": "https://api.jolpi.ca/ergast/f1/1968/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "48",
+    "wins": "3",
+    "Driver": {
+     "driverId": "hill",
+     "url": "http://en.wikipedia.org/wiki/Graham_Hill",
+     "givenName": "Graham",
+     "familyName": "Hill",
+     "dateOfBirth": "1929-02-15",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "lotus-ford",
+      "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+      "name": "Lotus-Ford",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1969,
+   "round": 11,
+   "source": "https://api.jolpi.ca/ergast/f1/1969/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "63",
+    "wins": "6",
+    "Driver": {
+     "driverId": "stewart",
+     "url": "http://en.wikipedia.org/wiki/Jackie_Stewart",
+     "givenName": "Jackie",
+     "familyName": "Stewart",
+     "dateOfBirth": "1939-06-11",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "matra-ford",
+      "url": "https://en.wikipedia.org/wiki/Matra",
+      "name": "Matra-Ford",
+      "nationality": "French"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1970,
+   "round": 13,
+   "source": "https://api.jolpi.ca/ergast/f1/1970/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "45",
+    "wins": "5",
+    "Driver": {
+     "driverId": "rindt",
+     "url": "http://en.wikipedia.org/wiki/Jochen_Rindt",
+     "givenName": "Jochen",
+     "familyName": "Rindt",
+     "dateOfBirth": "1942-04-18",
+     "nationality": "Austrian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "team_lotus",
+      "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+      "name": "Team Lotus",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1971,
+   "round": 11,
+   "source": "https://api.jolpi.ca/ergast/f1/1971/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "62",
+    "wins": "6",
+    "Driver": {
+     "driverId": "stewart",
+     "url": "http://en.wikipedia.org/wiki/Jackie_Stewart",
+     "givenName": "Jackie",
+     "familyName": "Stewart",
+     "dateOfBirth": "1939-06-11",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "tyrrell",
+      "url": "https://en.wikipedia.org/wiki/Tyrrell_Racing",
+      "name": "Tyrrell",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1972,
+   "round": 12,
+   "source": "https://api.jolpi.ca/ergast/f1/1972/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "61",
+    "wins": "5",
+    "Driver": {
+     "driverId": "emerson_fittipaldi",
+     "url": "http://en.wikipedia.org/wiki/Emerson_Fittipaldi",
+     "givenName": "Emerson",
+     "familyName": "Fittipaldi",
+     "dateOfBirth": "1946-12-12",
+     "nationality": "Brazilian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "team_lotus",
+      "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+      "name": "Team Lotus",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1973,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1973/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "71",
+    "wins": "5",
+    "Driver": {
+     "driverId": "stewart",
+     "url": "http://en.wikipedia.org/wiki/Jackie_Stewart",
+     "givenName": "Jackie",
+     "familyName": "Stewart",
+     "dateOfBirth": "1939-06-11",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "tyrrell",
+      "url": "https://en.wikipedia.org/wiki/Tyrrell_Racing",
+      "name": "Tyrrell",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1974,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1974/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "55",
+    "wins": "3",
+    "Driver": {
+     "driverId": "emerson_fittipaldi",
+     "url": "http://en.wikipedia.org/wiki/Emerson_Fittipaldi",
+     "givenName": "Emerson",
+     "familyName": "Fittipaldi",
+     "dateOfBirth": "1946-12-12",
+     "nationality": "Brazilian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1975,
+   "round": 14,
+   "source": "https://api.jolpi.ca/ergast/f1/1975/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "64.5",
+    "wins": "5",
+    "Driver": {
+     "driverId": "lauda",
+     "url": "http://en.wikipedia.org/wiki/Niki_Lauda",
+     "givenName": "Niki",
+     "familyName": "Lauda",
+     "dateOfBirth": "1949-02-22",
+     "nationality": "Austrian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1976,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1976/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "69",
+    "wins": "6",
+    "Driver": {
+     "driverId": "hunt",
+     "url": "http://en.wikipedia.org/wiki/James_Hunt",
+     "givenName": "James",
+     "familyName": "Hunt",
+     "dateOfBirth": "1947-08-29",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1977,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/1977/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "70",
+    "wins": "3",
+    "Driver": {
+     "driverId": "lauda",
+     "url": "http://en.wikipedia.org/wiki/Niki_Lauda",
+     "givenName": "Niki",
+     "familyName": "Lauda",
+     "dateOfBirth": "1949-02-22",
+     "nationality": "Austrian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1978,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1978/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "64",
+    "wins": "6",
+    "Driver": {
+     "driverId": "mario_andretti",
+     "url": "http://en.wikipedia.org/wiki/Mario_Andretti",
+     "givenName": "Mario",
+     "familyName": "Andretti",
+     "dateOfBirth": "1940-02-28",
+     "nationality": "American"
+    },
+    "Constructors": [
+     {
+      "constructorId": "team_lotus",
+      "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+      "name": "Team Lotus",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1979,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1979/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "51",
+    "wins": "3",
+    "Driver": {
+     "driverId": "scheckter",
+     "url": "http://en.wikipedia.org/wiki/Jody_Scheckter",
+     "givenName": "Jody",
+     "familyName": "Scheckter",
+     "dateOfBirth": "1950-01-29",
+     "nationality": "South African"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1980,
+   "round": 14,
+   "source": "https://api.jolpi.ca/ergast/f1/1980/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "67",
+    "wins": "5",
+    "Driver": {
+     "driverId": "jones",
+     "url": "http://en.wikipedia.org/wiki/Alan_Jones_(Formula_1)",
+     "givenName": "Alan",
+     "familyName": "Jones",
+     "dateOfBirth": "1946-11-02",
+     "nationality": "Australian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "williams",
+      "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+      "name": "Williams",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1981,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1981/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "50",
+    "wins": "3",
+    "Driver": {
+     "driverId": "piquet",
+     "url": "http://en.wikipedia.org/wiki/Nelson_Piquet",
+     "givenName": "Nelson",
+     "familyName": "Piquet",
+     "dateOfBirth": "1952-08-17",
+     "nationality": "Brazilian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "brabham",
+      "url": "https://en.wikipedia.org/wiki/Brabham",
+      "name": "Brabham",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1982,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1982/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "44",
+    "wins": "1",
+    "Driver": {
+     "driverId": "keke_rosberg",
+     "url": "http://en.wikipedia.org/wiki/Keke_Rosberg",
+     "givenName": "Keke",
+     "familyName": "Rosberg",
+     "dateOfBirth": "1948-12-06",
+     "nationality": "Finnish"
+    },
+    "Constructors": [
+     {
+      "constructorId": "williams",
+      "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+      "name": "Williams",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1983,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1983/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "59",
+    "wins": "3",
+    "Driver": {
+     "driverId": "piquet",
+     "url": "http://en.wikipedia.org/wiki/Nelson_Piquet",
+     "givenName": "Nelson",
+     "familyName": "Piquet",
+     "dateOfBirth": "1952-08-17",
+     "nationality": "Brazilian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "brabham",
+      "url": "https://en.wikipedia.org/wiki/Brabham",
+      "name": "Brabham",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1984,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1984/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "72",
+    "wins": "5",
+    "Driver": {
+     "driverId": "lauda",
+     "url": "http://en.wikipedia.org/wiki/Niki_Lauda",
+     "givenName": "Niki",
+     "familyName": "Lauda",
+     "dateOfBirth": "1949-02-22",
+     "nationality": "Austrian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1985,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1985/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "73",
+    "wins": "5",
+    "Driver": {
+     "driverId": "prost",
+     "url": "http://en.wikipedia.org/wiki/Alain_Prost",
+     "givenName": "Alain",
+     "familyName": "Prost",
+     "dateOfBirth": "1955-02-24",
+     "nationality": "French"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1986,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1986/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "72",
+    "wins": "4",
+    "Driver": {
+     "driverId": "prost",
+     "url": "http://en.wikipedia.org/wiki/Alain_Prost",
+     "givenName": "Alain",
+     "familyName": "Prost",
+     "dateOfBirth": "1955-02-24",
+     "nationality": "French"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1987,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1987/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "73",
+    "wins": "3",
+    "Driver": {
+     "driverId": "piquet",
+     "url": "http://en.wikipedia.org/wiki/Nelson_Piquet",
+     "givenName": "Nelson",
+     "familyName": "Piquet",
+     "dateOfBirth": "1952-08-17",
+     "nationality": "Brazilian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "williams",
+      "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+      "name": "Williams",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1988,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1988/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "90",
+    "wins": "8",
+    "Driver": {
+     "driverId": "senna",
+     "url": "http://en.wikipedia.org/wiki/Ayrton_Senna",
+     "givenName": "Ayrton",
+     "familyName": "Senna",
+     "dateOfBirth": "1960-03-21",
+     "nationality": "Brazilian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1989,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1989/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "76",
+    "wins": "4",
+    "Driver": {
+     "driverId": "prost",
+     "url": "http://en.wikipedia.org/wiki/Alain_Prost",
+     "givenName": "Alain",
+     "familyName": "Prost",
+     "dateOfBirth": "1955-02-24",
+     "nationality": "French"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1990,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1990/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "78",
+    "wins": "6",
+    "Driver": {
+     "driverId": "senna",
+     "url": "http://en.wikipedia.org/wiki/Ayrton_Senna",
+     "givenName": "Ayrton",
+     "familyName": "Senna",
+     "dateOfBirth": "1960-03-21",
+     "nationality": "Brazilian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1991,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1991/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "96",
+    "wins": "7",
+    "Driver": {
+     "driverId": "senna",
+     "url": "http://en.wikipedia.org/wiki/Ayrton_Senna",
+     "givenName": "Ayrton",
+     "familyName": "Senna",
+     "dateOfBirth": "1960-03-21",
+     "nationality": "Brazilian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1992,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1992/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "108",
+    "wins": "9",
+    "Driver": {
+     "driverId": "mansell",
+     "url": "http://en.wikipedia.org/wiki/Nigel_Mansell",
+     "givenName": "Nigel",
+     "familyName": "Mansell",
+     "dateOfBirth": "1953-08-08",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "williams",
+      "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+      "name": "Williams",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1993,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1993/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "99",
+    "wins": "7",
+    "Driver": {
+     "driverId": "prost",
+     "url": "http://en.wikipedia.org/wiki/Alain_Prost",
+     "givenName": "Alain",
+     "familyName": "Prost",
+     "dateOfBirth": "1955-02-24",
+     "nationality": "French"
+    },
+    "Constructors": [
+     {
+      "constructorId": "williams",
+      "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+      "name": "Williams",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1994,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1994/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "92",
+    "wins": "8",
+    "Driver": {
+     "driverId": "michael_schumacher",
+     "code": "MSC",
+     "url": "http://en.wikipedia.org/wiki/Michael_Schumacher",
+     "givenName": "Michael",
+     "familyName": "Schumacher",
+     "dateOfBirth": "1969-01-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "benetton",
+      "url": "https://en.wikipedia.org/wiki/Benetton_Formula",
+      "name": "Benetton",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1995,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/1995/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "102",
+    "wins": "9",
+    "Driver": {
+     "driverId": "michael_schumacher",
+     "code": "MSC",
+     "url": "http://en.wikipedia.org/wiki/Michael_Schumacher",
+     "givenName": "Michael",
+     "familyName": "Schumacher",
+     "dateOfBirth": "1969-01-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "benetton",
+      "url": "https://en.wikipedia.org/wiki/Benetton_Formula",
+      "name": "Benetton",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1996,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1996/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "97",
+    "wins": "8",
+    "Driver": {
+     "driverId": "damon_hill",
+     "url": "http://en.wikipedia.org/wiki/Damon_Hill",
+     "givenName": "Damon",
+     "familyName": "Hill",
+     "dateOfBirth": "1960-09-17",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "williams",
+      "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+      "name": "Williams",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1997,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/1997/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "81",
+    "wins": "7",
+    "Driver": {
+     "driverId": "villeneuve",
+     "code": "VIL",
+     "url": "http://en.wikipedia.org/wiki/Jacques_Villeneuve",
+     "givenName": "Jacques",
+     "familyName": "Villeneuve",
+     "dateOfBirth": "1971-04-09",
+     "nationality": "Canadian"
+    },
+    "Constructors": [
+     {
+      "constructorId": "williams",
+      "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+      "name": "Williams",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1998,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1998/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "100",
+    "wins": "8",
+    "Driver": {
+     "driverId": "hakkinen",
+     "url": "http://en.wikipedia.org/wiki/Mika_H%C3%A4kkinen",
+     "givenName": "Mika",
+     "familyName": "Häkkinen",
+     "dateOfBirth": "1968-09-28",
+     "nationality": "Finnish"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 1999,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1999/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "76",
+    "wins": "5",
+    "Driver": {
+     "driverId": "hakkinen",
+     "url": "http://en.wikipedia.org/wiki/Mika_H%C3%A4kkinen",
+     "givenName": "Mika",
+     "familyName": "Häkkinen",
+     "dateOfBirth": "1968-09-28",
+     "nationality": "Finnish"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2000,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2000/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "108",
+    "wins": "9",
+    "Driver": {
+     "driverId": "michael_schumacher",
+     "code": "MSC",
+     "url": "http://en.wikipedia.org/wiki/Michael_Schumacher",
+     "givenName": "Michael",
+     "familyName": "Schumacher",
+     "dateOfBirth": "1969-01-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2001,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2001/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "123",
+    "wins": "9",
+    "Driver": {
+     "driverId": "michael_schumacher",
+     "code": "MSC",
+     "url": "http://en.wikipedia.org/wiki/Michael_Schumacher",
+     "givenName": "Michael",
+     "familyName": "Schumacher",
+     "dateOfBirth": "1969-01-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2002,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2002/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "144",
+    "wins": "11",
+    "Driver": {
+     "driverId": "michael_schumacher",
+     "code": "MSC",
+     "url": "http://en.wikipedia.org/wiki/Michael_Schumacher",
+     "givenName": "Michael",
+     "familyName": "Schumacher",
+     "dateOfBirth": "1969-01-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2003,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/2003/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "93",
+    "wins": "6",
+    "Driver": {
+     "driverId": "michael_schumacher",
+     "code": "MSC",
+     "url": "http://en.wikipedia.org/wiki/Michael_Schumacher",
+     "givenName": "Michael",
+     "familyName": "Schumacher",
+     "dateOfBirth": "1969-01-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2004,
+   "round": 18,
+   "source": "https://api.jolpi.ca/ergast/f1/2004/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "148",
+    "wins": "13",
+    "Driver": {
+     "driverId": "michael_schumacher",
+     "code": "MSC",
+     "url": "http://en.wikipedia.org/wiki/Michael_Schumacher",
+     "givenName": "Michael",
+     "familyName": "Schumacher",
+     "dateOfBirth": "1969-01-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2005,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2005/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "133",
+    "wins": "7",
+    "Driver": {
+     "driverId": "alonso",
+     "permanentNumber": "14",
+     "code": "ALO",
+     "url": "http://en.wikipedia.org/wiki/Fernando_Alonso",
+     "givenName": "Fernando",
+     "familyName": "Alonso",
+     "dateOfBirth": "1981-07-29",
+     "nationality": "Spanish"
+    },
+    "Constructors": [
+     {
+      "constructorId": "renault",
+      "url": "https://en.wikipedia.org/wiki/Renault_in_Formula_One",
+      "name": "Renault",
+      "nationality": "French"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2006,
+   "round": 18,
+   "source": "https://api.jolpi.ca/ergast/f1/2006/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "134",
+    "wins": "7",
+    "Driver": {
+     "driverId": "alonso",
+     "permanentNumber": "14",
+     "code": "ALO",
+     "url": "http://en.wikipedia.org/wiki/Fernando_Alonso",
+     "givenName": "Fernando",
+     "familyName": "Alonso",
+     "dateOfBirth": "1981-07-29",
+     "nationality": "Spanish"
+    },
+    "Constructors": [
+     {
+      "constructorId": "renault",
+      "url": "https://en.wikipedia.org/wiki/Renault_in_Formula_One",
+      "name": "Renault",
+      "nationality": "French"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2007,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2007/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "110",
+    "wins": "6",
+    "Driver": {
+     "driverId": "raikkonen",
+     "permanentNumber": "7",
+     "code": "RAI",
+     "url": "http://en.wikipedia.org/wiki/Kimi_R%C3%A4ikk%C3%B6nen",
+     "givenName": "Kimi",
+     "familyName": "Räikkönen",
+     "dateOfBirth": "1979-10-17",
+     "nationality": "Finnish"
+    },
+    "Constructors": [
+     {
+      "constructorId": "ferrari",
+      "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+      "name": "Ferrari",
+      "nationality": "Italian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2008,
+   "round": 18,
+   "source": "https://api.jolpi.ca/ergast/f1/2008/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "98",
+    "wins": "5",
+    "Driver": {
+     "driverId": "hamilton",
+     "permanentNumber": "44",
+     "code": "HAM",
+     "url": "http://en.wikipedia.org/wiki/Lewis_Hamilton",
+     "givenName": "Lewis",
+     "familyName": "Hamilton",
+     "dateOfBirth": "1985-01-07",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2009,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2009/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "95",
+    "wins": "6",
+    "Driver": {
+     "driverId": "button",
+     "permanentNumber": "22",
+     "code": "BUT",
+     "url": "http://en.wikipedia.org/wiki/Jenson_Button",
+     "givenName": "Jenson",
+     "familyName": "Button",
+     "dateOfBirth": "1980-01-19",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "brawn",
+      "url": "https://en.wikipedia.org/wiki/Brawn_GP",
+      "name": "Brawn",
+      "nationality": "British"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2010,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2010/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "256",
+    "wins": "5",
+    "Driver": {
+     "driverId": "vettel",
+     "permanentNumber": "5",
+     "code": "VET",
+     "url": "http://en.wikipedia.org/wiki/Sebastian_Vettel",
+     "givenName": "Sebastian",
+     "familyName": "Vettel",
+     "dateOfBirth": "1987-07-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "red_bull",
+      "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+      "name": "Red Bull",
+      "nationality": "Austrian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2011,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2011/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "392",
+    "wins": "11",
+    "Driver": {
+     "driverId": "vettel",
+     "permanentNumber": "5",
+     "code": "VET",
+     "url": "http://en.wikipedia.org/wiki/Sebastian_Vettel",
+     "givenName": "Sebastian",
+     "familyName": "Vettel",
+     "dateOfBirth": "1987-07-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "red_bull",
+      "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+      "name": "Red Bull",
+      "nationality": "Austrian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2012,
+   "round": 20,
+   "source": "https://api.jolpi.ca/ergast/f1/2012/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "281",
+    "wins": "5",
+    "Driver": {
+     "driverId": "vettel",
+     "permanentNumber": "5",
+     "code": "VET",
+     "url": "http://en.wikipedia.org/wiki/Sebastian_Vettel",
+     "givenName": "Sebastian",
+     "familyName": "Vettel",
+     "dateOfBirth": "1987-07-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "red_bull",
+      "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+      "name": "Red Bull",
+      "nationality": "Austrian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2013,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2013/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "397",
+    "wins": "13",
+    "Driver": {
+     "driverId": "vettel",
+     "permanentNumber": "5",
+     "code": "VET",
+     "url": "http://en.wikipedia.org/wiki/Sebastian_Vettel",
+     "givenName": "Sebastian",
+     "familyName": "Vettel",
+     "dateOfBirth": "1987-07-03",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "red_bull",
+      "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+      "name": "Red Bull",
+      "nationality": "Austrian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2014,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2014/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "384",
+    "wins": "11",
+    "Driver": {
+     "driverId": "hamilton",
+     "permanentNumber": "44",
+     "code": "HAM",
+     "url": "http://en.wikipedia.org/wiki/Lewis_Hamilton",
+     "givenName": "Lewis",
+     "familyName": "Hamilton",
+     "dateOfBirth": "1985-01-07",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mercedes",
+      "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+      "name": "Mercedes",
+      "nationality": "German"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2015,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2015/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "381",
+    "wins": "10",
+    "Driver": {
+     "driverId": "hamilton",
+     "permanentNumber": "44",
+     "code": "HAM",
+     "url": "http://en.wikipedia.org/wiki/Lewis_Hamilton",
+     "givenName": "Lewis",
+     "familyName": "Hamilton",
+     "dateOfBirth": "1985-01-07",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mercedes",
+      "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+      "name": "Mercedes",
+      "nationality": "German"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2016,
+   "round": 21,
+   "source": "https://api.jolpi.ca/ergast/f1/2016/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "385",
+    "wins": "9",
+    "Driver": {
+     "driverId": "rosberg",
+     "permanentNumber": "6",
+     "code": "ROS",
+     "url": "http://en.wikipedia.org/wiki/Nico_Rosberg",
+     "givenName": "Nico",
+     "familyName": "Rosberg",
+     "dateOfBirth": "1985-06-27",
+     "nationality": "German"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mercedes",
+      "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+      "name": "Mercedes",
+      "nationality": "German"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2017,
+   "round": 20,
+   "source": "https://api.jolpi.ca/ergast/f1/2017/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "363",
+    "wins": "9",
+    "Driver": {
+     "driverId": "hamilton",
+     "permanentNumber": "44",
+     "code": "HAM",
+     "url": "http://en.wikipedia.org/wiki/Lewis_Hamilton",
+     "givenName": "Lewis",
+     "familyName": "Hamilton",
+     "dateOfBirth": "1985-01-07",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mercedes",
+      "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+      "name": "Mercedes",
+      "nationality": "German"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2018,
+   "round": 21,
+   "source": "https://api.jolpi.ca/ergast/f1/2018/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "408",
+    "wins": "11",
+    "Driver": {
+     "driverId": "hamilton",
+     "permanentNumber": "44",
+     "code": "HAM",
+     "url": "http://en.wikipedia.org/wiki/Lewis_Hamilton",
+     "givenName": "Lewis",
+     "familyName": "Hamilton",
+     "dateOfBirth": "1985-01-07",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mercedes",
+      "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+      "name": "Mercedes",
+      "nationality": "German"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2019,
+   "round": 21,
+   "source": "https://api.jolpi.ca/ergast/f1/2019/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "413",
+    "wins": "11",
+    "Driver": {
+     "driverId": "hamilton",
+     "permanentNumber": "44",
+     "code": "HAM",
+     "url": "http://en.wikipedia.org/wiki/Lewis_Hamilton",
+     "givenName": "Lewis",
+     "familyName": "Hamilton",
+     "dateOfBirth": "1985-01-07",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mercedes",
+      "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+      "name": "Mercedes",
+      "nationality": "German"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2020,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2020/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "347",
+    "wins": "11",
+    "Driver": {
+     "driverId": "hamilton",
+     "permanentNumber": "44",
+     "code": "HAM",
+     "url": "http://en.wikipedia.org/wiki/Lewis_Hamilton",
+     "givenName": "Lewis",
+     "familyName": "Hamilton",
+     "dateOfBirth": "1985-01-07",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mercedes",
+      "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+      "name": "Mercedes",
+      "nationality": "German"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2021,
+   "round": 22,
+   "source": "https://api.jolpi.ca/ergast/f1/2021/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "395.5",
+    "wins": "10",
+    "Driver": {
+     "driverId": "max_verstappen",
+     "permanentNumber": "3",
+     "code": "VER",
+     "url": "http://en.wikipedia.org/wiki/Max_Verstappen",
+     "givenName": "Max",
+     "familyName": "Verstappen",
+     "dateOfBirth": "1997-09-30",
+     "nationality": "Dutch"
+    },
+    "Constructors": [
+     {
+      "constructorId": "red_bull",
+      "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+      "name": "Red Bull",
+      "nationality": "Austrian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2022,
+   "round": 22,
+   "source": "https://api.jolpi.ca/ergast/f1/2022/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "454",
+    "wins": "15",
+    "Driver": {
+     "driverId": "max_verstappen",
+     "permanentNumber": "3",
+     "code": "VER",
+     "url": "http://en.wikipedia.org/wiki/Max_Verstappen",
+     "givenName": "Max",
+     "familyName": "Verstappen",
+     "dateOfBirth": "1997-09-30",
+     "nationality": "Dutch"
+    },
+    "Constructors": [
+     {
+      "constructorId": "red_bull",
+      "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+      "name": "Red Bull",
+      "nationality": "Austrian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2023,
+   "round": 22,
+   "source": "https://api.jolpi.ca/ergast/f1/2023/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "575",
+    "wins": "19",
+    "Driver": {
+     "driverId": "max_verstappen",
+     "permanentNumber": "3",
+     "code": "VER",
+     "url": "http://en.wikipedia.org/wiki/Max_Verstappen",
+     "givenName": "Max",
+     "familyName": "Verstappen",
+     "dateOfBirth": "1997-09-30",
+     "nationality": "Dutch"
+    },
+    "Constructors": [
+     {
+      "constructorId": "red_bull",
+      "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+      "name": "Red Bull",
+      "nationality": "Austrian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2024,
+   "round": 24,
+   "source": "https://api.jolpi.ca/ergast/f1/2024/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "437",
+    "wins": "9",
+    "Driver": {
+     "driverId": "max_verstappen",
+     "permanentNumber": "3",
+     "code": "VER",
+     "url": "http://en.wikipedia.org/wiki/Max_Verstappen",
+     "givenName": "Max",
+     "familyName": "Verstappen",
+     "dateOfBirth": "1997-09-30",
+     "nationality": "Dutch"
+    },
+    "Constructors": [
+     {
+      "constructorId": "red_bull",
+      "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+      "name": "Red Bull",
+      "nationality": "Austrian"
+     }
+    ]
+   }
+  },
+  {
+   "year": 2025,
+   "round": 24,
+   "source": "https://api.jolpi.ca/ergast/f1/2025/driverStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "423",
+    "wins": "7",
+    "Driver": {
+     "driverId": "norris",
+     "permanentNumber": "1",
+     "code": "NOR",
+     "url": "http://en.wikipedia.org/wiki/Lando_Norris",
+     "givenName": "Lando",
+     "familyName": "Norris",
+     "dateOfBirth": "1999-11-13",
+     "nationality": "British"
+    },
+    "Constructors": [
+     {
+      "constructorId": "mclaren",
+      "url": "https://en.wikipedia.org/wiki/McLaren",
+      "name": "McLaren",
+      "nationality": "British"
+     }
+    ]
+   }
+  }
+ ],
+ "constructors": [
+  {
+   "year": 1958,
+   "round": 11,
+   "source": "https://api.jolpi.ca/ergast/f1/1958/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "48",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "vanwall",
+     "url": "https://en.wikipedia.org/wiki/Vanwall",
+     "name": "Vanwall",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1959,
+   "round": 9,
+   "source": "https://api.jolpi.ca/ergast/f1/1959/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "40",
+    "wins": "5",
+    "Constructor": {
+     "constructorId": "cooper-climax",
+     "url": "https://en.wikipedia.org/wiki/Cooper_Car_Company",
+     "name": "Cooper-Climax",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1960,
+   "round": 10,
+   "source": "https://api.jolpi.ca/ergast/f1/1960/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "48",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "cooper-climax",
+     "url": "https://en.wikipedia.org/wiki/Cooper_Car_Company",
+     "name": "Cooper-Climax",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1961,
+   "round": 8,
+   "source": "https://api.jolpi.ca/ergast/f1/1961/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "45",
+    "wins": "5",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 1962,
+   "round": 9,
+   "source": "https://api.jolpi.ca/ergast/f1/1962/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "42",
+    "wins": "4",
+    "Constructor": {
+     "constructorId": "brm",
+     "url": "https://en.wikipedia.org/wiki/British_Racing_Motors",
+     "name": "BRM",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1963,
+   "round": 10,
+   "source": "https://api.jolpi.ca/ergast/f1/1963/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "54",
+    "wins": "7",
+    "Constructor": {
+     "constructorId": "lotus-climax",
+     "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+     "name": "Lotus-Climax",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1964,
+   "round": 10,
+   "source": "https://api.jolpi.ca/ergast/f1/1964/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "45",
+    "wins": "3",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 1965,
+   "round": 10,
+   "source": "https://api.jolpi.ca/ergast/f1/1965/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "54",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "lotus-climax",
+     "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+     "name": "Lotus-Climax",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1966,
+   "round": 9,
+   "source": "https://api.jolpi.ca/ergast/f1/1966/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "42",
+    "wins": "4",
+    "Constructor": {
+     "constructorId": "brabham-repco",
+     "url": "https://en.wikipedia.org/wiki/Brabham",
+     "name": "Brabham-Repco",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1967,
+   "round": 11,
+   "source": "https://api.jolpi.ca/ergast/f1/1967/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "67",
+    "wins": "4",
+    "Constructor": {
+     "constructorId": "brabham-repco",
+     "url": "https://en.wikipedia.org/wiki/Brabham",
+     "name": "Brabham-Repco",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1968,
+   "round": 12,
+   "source": "https://api.jolpi.ca/ergast/f1/1968/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "62",
+    "wins": "5",
+    "Constructor": {
+     "constructorId": "lotus-ford",
+     "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+     "name": "Lotus-Ford",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1969,
+   "round": 11,
+   "source": "https://api.jolpi.ca/ergast/f1/1969/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "66",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "matra-ford",
+     "url": "https://en.wikipedia.org/wiki/Matra",
+     "name": "Matra-Ford",
+     "nationality": "French"
+    }
+   }
+  },
+  {
+   "year": 1970,
+   "round": 13,
+   "source": "https://api.jolpi.ca/ergast/f1/1970/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "59",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "team_lotus",
+     "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+     "name": "Team Lotus",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1971,
+   "round": 11,
+   "source": "https://api.jolpi.ca/ergast/f1/1971/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "73",
+    "wins": "7",
+    "Constructor": {
+     "constructorId": "tyrrell",
+     "url": "https://en.wikipedia.org/wiki/Tyrrell_Racing",
+     "name": "Tyrrell",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1972,
+   "round": 12,
+   "source": "https://api.jolpi.ca/ergast/f1/1972/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "61",
+    "wins": "5",
+    "Constructor": {
+     "constructorId": "team_lotus",
+     "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+     "name": "Team Lotus",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1973,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1973/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "91",
+    "wins": "7",
+    "Constructor": {
+     "constructorId": "team_lotus",
+     "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+     "name": "Team Lotus",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1974,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1974/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "72",
+    "wins": "4",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1975,
+   "round": 14,
+   "source": "https://api.jolpi.ca/ergast/f1/1975/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "72.5",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 1976,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1976/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "83",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 1977,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/1977/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "84",
+    "wins": "4",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 1978,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1978/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "86",
+    "wins": "8",
+    "Constructor": {
+     "constructorId": "team_lotus",
+     "url": "https://en.wikipedia.org/wiki/Team_Lotus",
+     "name": "Team Lotus",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1979,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1979/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "113",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 1980,
+   "round": 14,
+   "source": "https://api.jolpi.ca/ergast/f1/1980/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "120",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "williams",
+     "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+     "name": "Williams",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1981,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1981/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "95",
+    "wins": "4",
+    "Constructor": {
+     "constructorId": "williams",
+     "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+     "name": "Williams",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1982,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1982/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "74",
+    "wins": "3",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 1983,
+   "round": 15,
+   "source": "https://api.jolpi.ca/ergast/f1/1983/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "89",
+    "wins": "4",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 1984,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1984/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "143.5",
+    "wins": "12",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1985,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1985/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "90",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1986,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1986/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "141",
+    "wins": "9",
+    "Constructor": {
+     "constructorId": "williams",
+     "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+     "name": "Williams",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1987,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1987/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "137",
+    "wins": "9",
+    "Constructor": {
+     "constructorId": "williams",
+     "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+     "name": "Williams",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1988,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1988/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "199",
+    "wins": "15",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1989,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1989/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "141",
+    "wins": "10",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1990,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1990/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "121",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1991,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1991/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "139",
+    "wins": "8",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1992,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1992/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "164",
+    "wins": "10",
+    "Constructor": {
+     "constructorId": "williams",
+     "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+     "name": "Williams",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1993,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1993/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "168",
+    "wins": "10",
+    "Constructor": {
+     "constructorId": "williams",
+     "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+     "name": "Williams",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1994,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1994/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "118",
+    "wins": "7",
+    "Constructor": {
+     "constructorId": "williams",
+     "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+     "name": "Williams",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1995,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/1995/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "147",
+    "wins": "11",
+    "Constructor": {
+     "constructorId": "benetton",
+     "url": "https://en.wikipedia.org/wiki/Benetton_Formula",
+     "name": "Benetton",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 1996,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1996/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "175",
+    "wins": "12",
+    "Constructor": {
+     "constructorId": "williams",
+     "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+     "name": "Williams",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1997,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/1997/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "123",
+    "wins": "8",
+    "Constructor": {
+     "constructorId": "williams",
+     "url": "https://en.wikipedia.org/wiki/Williams_Racing",
+     "name": "Williams",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1998,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1998/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "156",
+    "wins": "9",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 1999,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/1999/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "128",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 2000,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2000/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "170",
+    "wins": "10",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 2001,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2001/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "179",
+    "wins": "9",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 2002,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2002/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "221",
+    "wins": "15",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 2003,
+   "round": 16,
+   "source": "https://api.jolpi.ca/ergast/f1/2003/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "158",
+    "wins": "8",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 2004,
+   "round": 18,
+   "source": "https://api.jolpi.ca/ergast/f1/2004/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "262",
+    "wins": "15",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 2005,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2005/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "191",
+    "wins": "8",
+    "Constructor": {
+     "constructorId": "renault",
+     "url": "https://en.wikipedia.org/wiki/Renault_in_Formula_One",
+     "name": "Renault",
+     "nationality": "French"
+    }
+   }
+  },
+  {
+   "year": 2006,
+   "round": 18,
+   "source": "https://api.jolpi.ca/ergast/f1/2006/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "206",
+    "wins": "8",
+    "Constructor": {
+     "constructorId": "renault",
+     "url": "https://en.wikipedia.org/wiki/Renault_in_Formula_One",
+     "name": "Renault",
+     "nationality": "French"
+    }
+   }
+  },
+  {
+   "year": 2007,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2007/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "204",
+    "wins": "9",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 2008,
+   "round": 18,
+   "source": "https://api.jolpi.ca/ergast/f1/2008/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "172",
+    "wins": "8",
+    "Constructor": {
+     "constructorId": "ferrari",
+     "url": "https://en.wikipedia.org/wiki/Scuderia_Ferrari",
+     "name": "Ferrari",
+     "nationality": "Italian"
+    }
+   }
+  },
+  {
+   "year": 2009,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2009/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "172",
+    "wins": "8",
+    "Constructor": {
+     "constructorId": "brawn",
+     "url": "https://en.wikipedia.org/wiki/Brawn_GP",
+     "name": "Brawn",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 2010,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2010/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "498",
+    "wins": "9",
+    "Constructor": {
+     "constructorId": "red_bull",
+     "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+     "name": "Red Bull",
+     "nationality": "Austrian"
+    }
+   }
+  },
+  {
+   "year": 2011,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2011/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "650",
+    "wins": "12",
+    "Constructor": {
+     "constructorId": "red_bull",
+     "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+     "name": "Red Bull",
+     "nationality": "Austrian"
+    }
+   }
+  },
+  {
+   "year": 2012,
+   "round": 20,
+   "source": "https://api.jolpi.ca/ergast/f1/2012/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "460",
+    "wins": "7",
+    "Constructor": {
+     "constructorId": "red_bull",
+     "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+     "name": "Red Bull",
+     "nationality": "Austrian"
+    }
+   }
+  },
+  {
+   "year": 2013,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2013/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "596",
+    "wins": "13",
+    "Constructor": {
+     "constructorId": "red_bull",
+     "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+     "name": "Red Bull",
+     "nationality": "Austrian"
+    }
+   }
+  },
+  {
+   "year": 2014,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2014/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "701",
+    "wins": "16",
+    "Constructor": {
+     "constructorId": "mercedes",
+     "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+     "name": "Mercedes",
+     "nationality": "German"
+    }
+   }
+  },
+  {
+   "year": 2015,
+   "round": 19,
+   "source": "https://api.jolpi.ca/ergast/f1/2015/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "703",
+    "wins": "16",
+    "Constructor": {
+     "constructorId": "mercedes",
+     "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+     "name": "Mercedes",
+     "nationality": "German"
+    }
+   }
+  },
+  {
+   "year": 2016,
+   "round": 21,
+   "source": "https://api.jolpi.ca/ergast/f1/2016/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "765",
+    "wins": "19",
+    "Constructor": {
+     "constructorId": "mercedes",
+     "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+     "name": "Mercedes",
+     "nationality": "German"
+    }
+   }
+  },
+  {
+   "year": 2017,
+   "round": 20,
+   "source": "https://api.jolpi.ca/ergast/f1/2017/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "668",
+    "wins": "12",
+    "Constructor": {
+     "constructorId": "mercedes",
+     "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+     "name": "Mercedes",
+     "nationality": "German"
+    }
+   }
+  },
+  {
+   "year": 2018,
+   "round": 21,
+   "source": "https://api.jolpi.ca/ergast/f1/2018/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "655",
+    "wins": "11",
+    "Constructor": {
+     "constructorId": "mercedes",
+     "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+     "name": "Mercedes",
+     "nationality": "German"
+    }
+   }
+  },
+  {
+   "year": 2019,
+   "round": 21,
+   "source": "https://api.jolpi.ca/ergast/f1/2019/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "739",
+    "wins": "15",
+    "Constructor": {
+     "constructorId": "mercedes",
+     "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+     "name": "Mercedes",
+     "nationality": "German"
+    }
+   }
+  },
+  {
+   "year": 2020,
+   "round": 17,
+   "source": "https://api.jolpi.ca/ergast/f1/2020/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "573",
+    "wins": "13",
+    "Constructor": {
+     "constructorId": "mercedes",
+     "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+     "name": "Mercedes",
+     "nationality": "German"
+    }
+   }
+  },
+  {
+   "year": 2021,
+   "round": 22,
+   "source": "https://api.jolpi.ca/ergast/f1/2021/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "613.5",
+    "wins": "9",
+    "Constructor": {
+     "constructorId": "mercedes",
+     "url": "https://en.wikipedia.org/wiki/Mercedes-Benz_in_Formula_One",
+     "name": "Mercedes",
+     "nationality": "German"
+    }
+   }
+  },
+  {
+   "year": 2022,
+   "round": 22,
+   "source": "https://api.jolpi.ca/ergast/f1/2022/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "759",
+    "wins": "17",
+    "Constructor": {
+     "constructorId": "red_bull",
+     "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+     "name": "Red Bull",
+     "nationality": "Austrian"
+    }
+   }
+  },
+  {
+   "year": 2023,
+   "round": 22,
+   "source": "https://api.jolpi.ca/ergast/f1/2023/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "860",
+    "wins": "21",
+    "Constructor": {
+     "constructorId": "red_bull",
+     "url": "https://en.wikipedia.org/wiki/Red_Bull_Racing",
+     "name": "Red Bull",
+     "nationality": "Austrian"
+    }
+   }
+  },
+  {
+   "year": 2024,
+   "round": 24,
+   "source": "https://api.jolpi.ca/ergast/f1/2024/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "666",
+    "wins": "6",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  },
+  {
+   "year": 2025,
+   "round": 24,
+   "source": "https://api.jolpi.ca/ergast/f1/2025/constructorStandings/1.json",
+   "entry": {
+    "position": "1",
+    "positionText": "1",
+    "points": "833",
+    "wins": "14",
+    "Constructor": {
+     "constructorId": "mclaren",
+     "url": "https://en.wikipedia.org/wiki/McLaren",
+     "name": "McLaren",
+     "nationality": "British"
+    }
+   }
+  }
+ ]
+}

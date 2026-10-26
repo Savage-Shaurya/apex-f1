@@ -1,0 +1,32 @@
+/* Apex design tokens as plain custom properties, for non-Tailwind consumers
+ * (email previews, standalone embeds). The canonical Tailwind 4 @theme lives
+ * in apps/web/app/globals.css; JS values live in ./tokens.ts. A test keeps
+ * all three in sync. Live reference: the dev-only /design route.
+ */
+:root {
+  --color-ground-deep: #050506;
+  --color-ground: #0b0b0c;
+  --color-surface-1: #111113;
+  --color-surface-2: #17171a;
+  --color-surface-3: #1f1f23;
+  --color-surface-4: #2a2a2f;
+  --color-ink: #f4f4f5;
+  --color-ink-2: #c3c3cb;
+  --color-ink-3: #9e9ea8;
+  --color-ink-faint: #7a7a84;
+  --color-paper: #f3f2ee;
+  --color-paper-2: #e7e5df;
+  --color-paper-3: #d9d6ce;
+  --color-paper-ink: #0b0b0c;
+  --color-paper-ink-2: #3f3f46;
+  --color-paper-ink-3: #5c5c64;
+  --color-brand-red: #e10600;
+  --color-brand-red-hover: #c80500;
+  --color-brand-red-press: #b80500;
+  --color-red-ink: #ff4d42;
+  --color-red-ink-paper: #b30500;
+  --font-display: 'Anybody', 'Hanken Grotesk', system-ui, sans-serif;
+  --font-text: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-editorial: 'EB Garamond', Georgia, serif;
+  --font-timing: 'JetBrains Mono', ui-monospace, monospace;
+}

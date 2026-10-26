@@ -1,0 +1,24 @@
+{
+  "name": "@apex/workers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo *.tsbuildinfo",
+    "jolpica:historical": "tsx src/jolpica-historical.ts",
+    "jolpica:nightly": "tsx src/jolpica-nightly.ts",
+    "openf1:diagnostic": "tsx src/openf1-diagnostic.ts",
+    "youtube:nightly": "tsx src/youtube-nightly.ts"
+  },
+  "dependencies": {
+    "@apex/api-client": "workspace:*",
+    "@apex/db": "workspace:*",
+    "@apex/types": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.11"
+  }
+}

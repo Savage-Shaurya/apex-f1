@@ -1,0 +1,39 @@
+name: Season data catch-up
+
+# The daily hosting cron (03:00 UTC, apps/web/vercel.json) syncs the active
+# season within a 45 s function budget. When a run defers rounds (a fresh
+# database, a long correction backlog), these runs continue it: each job calls
+# the route again while its report says continuation:true (at most 8 bounded
+# requests), so a whole season fills in one job instead of over several days.
+# Once the season is complete each run is one cheap, idempotent check. Set repository variable
+# APEX_SITE_URL to the HTTPS deployment origin and secret CRON_SECRET to its
+# matching private cron token.
+
+on:
+  schedule:
+    - cron: "35 3-5 * * *" # 03:35, 04:35 and 05:35 UTC, after the 03:00 hosting run
+  workflow_dispatch: {}
+
+concurrency:
+  group: refresh-season
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Continue the season sync and validate its report
+        env:
+          APEX_SITE_URL: ${{ vars.APEX_SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node scripts/invoke-cron.mjs jolpica-nightly --until-complete=8

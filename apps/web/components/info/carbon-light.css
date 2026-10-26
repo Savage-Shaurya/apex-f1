@@ -1,0 +1,96 @@
+/*
+ * Carbon & Light for the live, predict, admin and info pages (page-live-info
+ * rollout, 2026-10-26). Promote to ds: `.bcp` maps the design-system tone
+ * tokens onto the brand-c materials, so every ds component inside these pages
+ * (Heading, Label, Stat, Unavailable, tables, badges) takes the night, carbon
+ * and titanium palette without being rewritten. Scoped to `.bcp`, which only
+ * these pages use, so nothing leaks into routes owned by other designers.
+ */
+.bcp {
+  --fg: #f4f5f7;
+  --fg-2: #c9ccd3;
+  --fg-3: #9b9ea7;
+  --bg: #050506;
+  --bg-raised: #0d0d10;
+  --bg-hover: #1a1a1f;
+  --rule: rgb(255 255 255 / 0.08);
+  --rule-strong: rgb(255 255 255 / 0.16);
+  --accent-text: #ff4f47;
+  --focus-ring: #f4f5f7;
+  color-scheme: dark;
+}
+/* No paper in Carbon & Light: a paper band inside these pages becomes carbon. */
+.bcp .tone-paper,
+.bcp .tone-raised,
+.bcp .tone-carbon,
+.bcp .tone-deep {
+  --fg: #f4f5f7;
+  --fg-2: #c9ccd3;
+  --fg-3: #9b9ea7;
+  --rule: rgb(255 255 255 / 0.08);
+  --rule-strong: rgb(255 255 255 / 0.16);
+  --accent-text: #ff4f47;
+  --focus-ring: #f4f5f7;
+  color-scheme: dark;
+}
+.bcp .tone-paper { --bg: #0a0a0c; --bg-raised: #111114; --bg-hover: #1a1a1f; }
+.bcp .tone-raised { --bg: #0d0d10; --bg-raised: #141418; --bg-hover: #1f1f24; }
+.bcp .tone-carbon, .bcp .tone-deep { --bg: #050506; --bg-raised: #0d0d10; --bg-hover: #1a1a1f; }
+
+/* A panel of brushed carbon with a lit top edge: the card material of the home. */
+.bcp-panel {
+  position: relative;
+  isolation: isolate;
+  border-radius: 22px;
+  background-color: #0b0b0d;
+  background-image:
+    linear-gradient(180deg, rgb(255 255 255 / 0.045), transparent 38%),
+    linear-gradient(115deg, transparent 20%, rgb(255 255 255 / 0.03) 42%, transparent 64%),
+    repeating-linear-gradient(135deg, rgb(255 255 255 / 0.016) 0 1px, transparent 1px 4px);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08), inset 0 1px 0 rgb(255 255 255 / 0.10);
+}
+.bcp-panel--flat { border-radius: 14px; }
+
+/* The light falling on a section from above (static: no canvas on these pages). */
+.bcp-flood {
+  background:
+    radial-gradient(ellipse 42% 70% at 70% -12%, rgb(233 240 255 / 0.16), transparent 70%),
+    radial-gradient(ellipse 20% 80% at 70% -8%, rgb(233 240 255 / 0.10), transparent 72%),
+    radial-gradient(ellipse 70% 50% at 20% 120%, rgb(233 240 255 / 0.04), transparent 70%);
+}
+/* Horizon: the line where the floodlight catches the floor. */
+.bcp-horizon { height: 1px; background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.32) 30%, rgb(255 255 255 / 0.32) 70%, transparent); }
+
+/* Tabs in the sub-bar: a red rule draws in under the current screen. */
+.bcp-tab { position: relative; }
+.bcp-tab::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: #e10600; transform: scaleX(0); transform-origin: left; transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+.bcp-tab:hover::after, .bcp-tab[aria-current='page']::after { transform: scaleX(1); }
+
+.bcp :is(a, button, input, select, textarea, summary):focus-visible { outline: 2px solid #f4f5f7; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bcp-tab::after { transition: none; }
+}
+
+/*
+ * Display type fitted to its column by the length of its longest word, so a
+ * long session name ("QUALIFYING") never breaks mid-word or overflows at any
+ * width. --fit-w = characters in the longest word, --fit-max = cap in rem,
+ * --fit-lg = share of the container the column takes from 1024px.
+ * 0.94em is the widest average advance of Anybody at 122% width, weight 780.
+ */
+.bcp-fit {
+  font-size: min(calc(var(--fit-max) * 1rem), calc((100vw - 2 * var(--page-margin) - 1rem) / (var(--fit-w) * 0.94)));
+}
+/*
+ * A rise mask sizes its em padding from its own font-size, so the fitted size
+ * sits on the mask (`bc-mask bcp-fit`), not on the rising line inside it.
+ * Garamond italic reaches further below the baseline than Anybody: its mask
+ * keeps the full descent (p, y) instead of the display face's 0.1em.
+ */
+.bc-mask.bcp-mask-serif { padding-bottom: 0.22em; margin-bottom: -0.22em; }
+@media (min-width: 1024px) {
+  .bcp-fit {
+    font-size: min(calc(var(--fit-max) * 1rem), calc((min(100vw, var(--container-max)) - 2 * var(--page-margin) - 1rem) * var(--fit-lg) / (var(--fit-w) * 0.94)));
+  }
+}

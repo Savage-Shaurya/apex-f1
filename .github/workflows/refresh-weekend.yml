@@ -1,0 +1,40 @@
+name: Race weekend results watch
+
+# Makes results appear on their own: while a qualifying, sprint or race
+# classification is due, /api/cron/weekend-watch reads it uncached from
+# Jolpica F1, revalidates the pages that show it as soon as it is published or
+# corrected, and stores race results in the database. Outside those windows a
+# run is one cached calendar read. Sessions run Friday to Sunday (UTC); the
+# race's correction watch reaches early Monday. Set repository variable
+# APEX_SITE_URL to the HTTPS deployment origin and secret CRON_SECRET to its
+# matching private cron token. GitHub schedules are best effort.
+
+on:
+  schedule:
+    - cron: "4-54/10 * * * 5,6,0" # every 10 minutes, Friday to Sunday UTC
+    - cron: "4-54/10 0-6 * * 1" # Monday early hours (late races, corrections)
+  workflow_dispatch: {}
+
+concurrency:
+  group: refresh-weekend
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Check due classifications and validate the report
+        env:
+          APEX_SITE_URL: ${{ vars.APEX_SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node scripts/invoke-cron.mjs weekend-watch
