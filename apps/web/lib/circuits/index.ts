@@ -11,10 +11,27 @@ const ALIASES: Record<string, string> = {
   cota: 'americas',
 };
 
-/** Real circuit outline (bacinger/f1-circuits, MIT) for a Jolpica circuitId. */
+/**
+ * Outlines whose source points run against the race direction. The lap trace follows point
+ * order, so these are reversed here (data.ts is generated and not edited by hand).
+ */
+const REVERSED_IN_SOURCE = new Set(['marina_bay']);
+
+/** The same closed outline walked the other way; the shared first/last point stays the start. */
+function reversed(c: CircuitGeometry): CircuitGeometry {
+  const points: number[] = [];
+  for (let i = c.points.length - 2; i >= 0; i -= 2) points.push(c.points[i]!, c.points[i + 1]!);
+  return { ...c, points };
+}
+
+const RACE_ORDER: Record<string, CircuitGeometry> = Object.fromEntries(
+  Object.entries(CIRCUITS).map(([id, c]) => [id, REVERSED_IN_SOURCE.has(id) ? reversed(c) : c]),
+);
+
+/** Real circuit outline (bacinger/f1-circuits, MIT) for a Jolpica circuitId, in race direction. */
 export function getCircuit(circuitId?: string | null): CircuitGeometry | null {
   if (!circuitId) return null;
-  return CIRCUITS[circuitId] ?? CIRCUITS[ALIASES[circuitId] ?? ''] ?? null;
+  return RACE_ORDER[circuitId] ?? RACE_ORDER[ALIASES[circuitId] ?? ''] ?? null;
 }
 
 /** Closed SVG path in the circuit's own width x height box. */

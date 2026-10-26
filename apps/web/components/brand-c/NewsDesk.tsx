@@ -34,7 +34,10 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
   // False in the server HTML and during hydration, true after: the next picture never competes with the LCP.
   const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
   const [failed, setFailed] = useState<ReadonlySet<number>>(() => new Set());
-  const reducedMotion = useReducedMotion() ?? false;
+  // The server cannot know the preference: the hydrating render must match its markup, so the
+  // preference applies from the first render after hydration (a reduced-motion visitor saw a
+  // "Hydration failed" error before this gate).
+  const reducedMotion = (useReducedMotion() ?? false) && hydrated;
   const root = useRef<HTMLElement>(null);
 
   useEffect(() => {
