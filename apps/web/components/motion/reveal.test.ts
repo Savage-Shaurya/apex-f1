@@ -27,11 +27,16 @@ for (const file of ['../drivers/motion/Rise.tsx', '../../app/support/_components
 test('one scroll clock: Lenis stepped by GSAP\'s ticker, no wheel dead zones, no custom cursor', () => {
   const provider = read('./ScrollProvider.tsx');
   // 2026-10-26 home redesign: smoothing returns, driven by the one clock.
-  assert.match(provider, /from 'lenis\/react'/);
-  assert.match(provider, /gsap\.ticker\.add\(step\)/, 'Lenis is stepped by GSAP\'s ticker');
-  assert.match(provider, /autoRaf: false/, 'Lenis never runs its own rAF loop');
-  assert.match(provider, /syncTouch: false/, 'touch keeps native momentum');
-  assert.match(provider, /lenis\.on\('scroll', update\)/, 'ScrollTrigger updates from Lenis');
+  // 2026-10-27 home performance: Lenis lives in its own chunk, fetched only where smoothing
+  // runs (fine pointer + hover, motion allowed), so phones never download it.
+  const smooth = read('./SmoothScroll.tsx');
+  assert.doesNotMatch(provider, /from 'lenis/, 'no static Lenis import in the shell');
+  assert.match(provider, /dynamic\(\(\) => import\('\.\/SmoothScroll'\), \{ ssr: false \}\)/, 'Lenis loads on demand');
+  assert.match(smooth, /from 'lenis\/react'/);
+  assert.match(smooth, /gsap\.ticker\.add\(step\)/, 'Lenis is stepped by GSAP\'s ticker');
+  assert.match(smooth, /autoRaf: false/, 'Lenis never runs its own rAF loop');
+  assert.match(smooth, /syncTouch: false/, 'touch keeps native momentum');
+  assert.match(smooth, /lenis\.on\('scroll', update\)/, 'ScrollTrigger updates from Lenis');
   assert.match(provider, /prefers-reduced-motion: no-preference/, 'off under reduced motion');
   assert.match(provider, /ScrollTrigger\.refresh\(\)/, 'scenes re-measure when the document settles');
   assert.match(read('../../app/shell-body.tsx'), /<ScrollProvider>/);
