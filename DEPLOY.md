@@ -22,6 +22,7 @@ The short version is in the README's Deploy section. This page lists what each e
 - Secret `CRON_SECRET`: used by the refresh workflows (`refresh-*.yml`) to call the cron routes.
 - Database backups (`db-backup.yml`): `SUPABASE_BACKUP_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, optionally `SUPABASE_DB_CA_CERT`. Restore steps: [`scripts/ops/restore-db.md`](scripts/ops/restore-db.md).
 - CI (`ci.yml`) runs the frozen install, dependency audit, typecheck, lint, tests, build and the quick quality gate with no service credentials.
+- CI Lighthouse (`.github/lighthouserc.json`) uses real (devtools) throttling. Performance must be at least 0.70 (owner decision, 2026-10-27: the full-bleed news hero scored 0.71-0.79 on a throttled phone); accessibility 0.95, SEO 0.95, best practices 0.90.
 
 ## Redis key scope and provider budgets (audit F-07, F-02, F-01)
 
