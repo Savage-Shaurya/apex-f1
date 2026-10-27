@@ -31,6 +31,10 @@ export const VARIANTS = {
   clipped: { html: page({ main: '<div style="width:120px;overflow:hidden;white-space:nowrap">Max Verstappen finished second after a late safety car</div>' }), expect: ['clipped'] },
   'broken-image': { html: page({ main: '<img src="/missing-image.png" alt="Car" width="200" height="100">' }), expect: ['broken-image'] },
   portrait: { html: page({ main: '<div data-portrait style="width:300px;height:150px"><img src="/tall.png" alt="Driver" style="width:300px;height:150px;object-fit:cover;object-position:50% 100%"></div>' }), expect: ['image-crop'] },
+  // A content photo cropped by cover still fails; only a full-bleed backdrop the user approved
+  // (data-backdrop: the news hero photo behind its words) may crop to fill the screen.
+  'cover-crop': { html: page({ main: '<img src="/pixel.png" alt="Car" style="width:300px;height:100px;object-fit:cover">' }), expect: ['image-crop'] },
+  backdrop: { html: page({ main: '<div data-backdrop style="width:300px;height:100px"><img src="/pixel.png" alt="" style="width:300px;height:100px;object-fit:cover"></div>' }), expect: [] },
   console: { html: page({ script: '<script>console.error("boom: hydration failed")</script>' }), expect: ['console'] },
   cls: { html: page({ main: '<p id="late-anchor">Standings table follows.</p><div style="height:600px">table</div>', script: '<script>setTimeout(()=>{const d=document.createElement("div");d.style.height="320px";d.textContent="late banner";document.querySelector("main").prepend(d)},1200)</script>' }), expect: ['cls'] },
   'no-nav': { html: page({ header: '<div>No header here</div>' }), expect: ['nav'] },

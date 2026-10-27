@@ -188,7 +188,8 @@ export function measureInPage() {
       findings.images.push({ src, problem: 'broken' });
       continue;
     }
-    if (img.naturalWidth && style.objectFit === 'cover') {
+    // A full-bleed backdrop behind words (data-backdrop, the news hero) fills any screen by design.
+    if (img.naturalWidth && style.objectFit === 'cover' && !img.closest('[data-backdrop]')) {
       const natural = img.naturalWidth / img.naturalHeight;
       const box = r.width / r.height;
       const loss = Math.abs(natural - box) / Math.max(natural, box);

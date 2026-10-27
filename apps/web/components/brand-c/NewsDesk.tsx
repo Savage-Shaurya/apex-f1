@@ -58,6 +58,21 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
   const slide = slides[index]!;
   const next = stepSlide(index, 1, count);
 
+  const bar = (i: number) => (
+    <span className="relative block h-[3px] w-full overflow-hidden rounded-full bg-white/20 transition-colors group-hover/bar:bg-white/35">
+      {i < index && <span className="absolute inset-0 bg-white/70" />}
+      {i === index && (
+        <span
+          key={`fill-${index}`}
+          className="bc-desk-fill absolute inset-0 bg-[color:var(--bc-red)]"
+          data-run={timed ? '' : undefined}
+          style={{ '--desk-ms': `${HERO_SLIDE_MS}ms`, animationPlayState: running ? 'running' : 'paused' } as CSSProperties}
+          onAnimationEnd={() => { if (running) step(1); }}
+        />
+      )}
+    </span>
+  );
+
   return (
     <section
       ref={root}
@@ -72,7 +87,7 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
     >
       {/* Picture: fills the whole hero edge to edge on every screen, with the words over it
           (user, 2026-10-26). The grid cell grows with the copy, and the photo grows with the cell. */}
-      <div aria-hidden className="relative col-start-1 row-start-1 overflow-hidden bg-[color:var(--bc-carbon)]">
+      <div aria-hidden data-backdrop className="relative col-start-1 row-start-1 overflow-hidden bg-[color:var(--bc-carbon)]">
         <AnimatePresence initial={false} mode="sync">
           <m.div
             key={index}
@@ -174,8 +189,10 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
 
         {count > 1 && (
           <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
-            {/* One thin timer bar per story; each is a button that shows that story. */}
-            <ol className="flex min-w-0 flex-[1_1_16rem] items-center gap-1.5" aria-label="Stories">
+            {/* One thin timer bar per story. From md each bar is a button that shows its story; on
+                phones eight 44 px targets do not fit, so the bars only show progress and the
+                Previous/Next buttons navigate. Only the visible set runs the timer animation. */}
+            <ol className="hidden min-w-0 flex-[1_1_16rem] items-center gap-1.5 md:flex" aria-label="Stories">
               {slides.map((s, i) => (
                 <li key={s.href} className="min-w-0 flex-1">
                   <button
@@ -185,22 +202,16 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
                     aria-current={i === index ? 'true' : undefined}
                     className="group/bar flex h-11 w-full items-center"
                   >
-                    <span className="relative block h-[3px] w-full overflow-hidden rounded-full bg-white/20 transition-colors group-hover/bar:bg-white/35">
-                      {i < index && <span className="absolute inset-0 bg-white/70" />}
-                      {i === index && (
-                        <span
-                          key={`fill-${index}`}
-                          className="bc-desk-fill absolute inset-0 bg-[color:var(--bc-red)]"
-                          data-run={timed ? '' : undefined}
-                          style={{ '--desk-ms': `${HERO_SLIDE_MS}ms`, animationPlayState: running ? 'running' : 'paused' } as CSSProperties}
-                          onAnimationEnd={() => { if (running) step(1); }}
-                        />
-                      )}
-                    </span>
+                    {bar(i)}
                   </button>
                 </li>
               ))}
             </ol>
+            <div aria-hidden className="flex min-w-0 flex-[1_1_100%] items-center gap-1.5 md:hidden">
+              {slides.map((s, i) => (
+                <span key={s.href} className="flex h-6 min-w-0 flex-1 items-center">{bar(i)}</span>
+              ))}
+            </div>
             <div className="flex items-center gap-1">
               <span className="bc-mono mr-2 text-[0.82rem] text-[color:var(--bc-silver)]" aria-hidden>
                 {pad(index + 1)} / {pad(count)}
