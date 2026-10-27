@@ -107,9 +107,10 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
                   src={slide.image}
                   alt=""
                   eager={index === 0}
-                  sizes="100vw"
+                  sizes="(max-width: 767px) 160vw, 100vw"
                   fit="cover"
                   allowUpscale
+                  optimize
                   focal="50% 30%"
                   className="absolute inset-0"
                   onFail={() => markFailed(index)}
@@ -122,7 +123,7 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
             It starts after the page load, so it never competes with the first photo (LCP). */}
         {hydrated && loaded && count > 1 && !failed.has(next) && (
           <div key={`pre-${next}`} className="pointer-events-none absolute inset-0 opacity-0">
-            <SmartImage src={slides[next]!.image} alt="" sizes="100vw" fit="cover" allowUpscale focal="50% 30%" className="absolute inset-0" onFail={() => markFailed(next)} />
+            <SmartImage src={slides[next]!.image} alt="" sizes="(max-width: 767px) 160vw, 100vw" fit="cover" allowUpscale optimize focal="50% 30%" className="absolute inset-0" onFail={() => markFailed(next)} />
           </div>
         )}
         {/* Scrims keep every word at AA on any photograph. Below lg the copy covers the lower half, so the

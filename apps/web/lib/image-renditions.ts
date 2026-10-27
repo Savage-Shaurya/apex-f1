@@ -209,3 +209,23 @@ export function heroResolutionScore(src?: string | null): number {
   if (!src) return 0;
   return bestRendition(src).maxWidth ?? 800;
 }
+
+/** next.config.ts `images.deviceSizes`; the optimizer answers 400 for any other width. */
+const OPTIMIZER_WIDTHS = [390, 640, 828, 1080, 1280, 1440, 1920, 2560];
+/** News publisher hosts listed in next.config.ts `images.remotePatterns`. */
+const OPTIMIZER_HOST = /^(?:cdn-\d+\.motorsport\.com|storage\.ghost\.io|i\.guim\.co\.uk)$/;
+
+/**
+ * The same picture through the Next image optimizer (resized, AVIF/WebP), for an LCP photo
+ * whose publisher serves only large JPEGs. The publisher's own rendition stays the fallback,
+ * so a refused or failed optimization still shows the photo.
+ */
+export function optimizedRendition(r: Rendition): Rendition {
+  let host: string;
+  try { host = new URL(r.src).hostname; } catch { return r; }
+  if (!OPTIMIZER_HOST.test(host)) return r;
+  const cover = OPTIMIZER_WIDTHS.find((w) => w >= (r.maxWidth ?? 1920)) ?? OPTIMIZER_WIDTHS.at(-1)!;
+  const widths = OPTIMIZER_WIDTHS.filter((w) => w <= cover);
+  const at = (w: number) => `/_next/image?url=${encodeURIComponent(r.src)}&w=${w}&q=75`;
+  return { src: at(cover), srcSet: widths.map((w) => `${at(w)} ${w}w`).join(', '), maxWidth: r.maxWidth, fallbacks: [r.src, ...(r.fallbacks ?? [])] };
+}

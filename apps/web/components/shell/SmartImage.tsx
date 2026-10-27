@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { bestRendition } from "@/lib/image-renditions";
+import { bestRendition, optimizedRendition } from "@/lib/image-renditions";
 import { recoverSettledImage } from "@/lib/settled-image";
 
 const WEDGE =
@@ -54,6 +54,8 @@ export interface SmartImageProps {
   focal?: string;
   /** Skip the native-scale guard (e.g. decorative textures). */
   allowUpscale?: boolean;
+  /** Serve a news publisher photo through the Next image optimizer first (LCP heroes). */
+  optimize?: boolean;
   onMeasure?: (m: ImageMeasure) => void;
   onFail?: () => void;
 }
@@ -116,10 +118,11 @@ function ImageContent({
   fit,
   focal,
   allowUpscale = false,
+  optimize = false,
   onMeasure,
   onFail,
 }: SmartImageProps & { src: string }) {
-  const rendition = useMemo(() => bestRendition(src), [src]);
+  const rendition = useMemo(() => (optimize ? optimizedRendition(bestRendition(src)) : bestRendition(src)), [src, optimize]);
   const chain = useMemo(() => [rendition.src, ...(rendition.fallbacks ?? []), src].filter((v, i, a) => a.indexOf(v) === i), [rendition, src]);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<"loading" | "loaded" | "failed">("loading");

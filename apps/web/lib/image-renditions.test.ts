@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bestRendition } from './image-renditions';
+import { bestRendition, optimizedRendition } from './image-renditions';
 
 const PEREZ = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Sergio_P%C3%A9rez_2019.jpg/330px-Sergio_P%C3%A9rez_2019.jpg';
 // Commons renditions are delivered from Apex's own origin (F-11, lib/commons-proxy.ts).
@@ -28,4 +28,17 @@ test('a motorsport.com URL that is already the s6 rendition still offers phone-s
   assert.equal(rendition.src, s6);
   assert.equal(rendition.srcSet, `${at('s3')} 300w, ${at('s2')} 413w, ${at('s1')} 600w, ${s6} 1200w`);
   assert.deepEqual(rendition.fallbacks, []);
+});
+
+test('the hero photo can go through the Next image optimizer, with the original as fallback', () => {
+  // The first news photo was a 330 KB JPEG straight from the publisher (Lighthouse LCP 5.9 s in CI).
+  const s6 = 'https://cdn-3.motorsport.com/images/amp/6VyKX7dY/s6/franco-colapinto-alpine.jpg';
+  const optimized = optimizedRendition(bestRendition(s6));
+  const at = (w: number) => `/_next/image?url=${encodeURIComponent(s6)}&w=${w}&q=75`;
+  assert.equal(optimized.src, at(1280));
+  // Only configured deviceSizes, never wider than the first size that covers the 1200 px original.
+  assert.equal(optimized.srcSet, [390, 640, 828, 1080, 1280].map((w) => `${at(w)} ${w}w`).join(', '));
+  assert.deepEqual(optimized.fallbacks, [s6]);
+  // Same-origin and unknown hosts are left alone (the optimizer only fetches configured hosts).
+  assert.equal(optimizedRendition(bestRendition('https://example.com/a.jpg')).src, 'https://example.com/a.jpg');
 });
