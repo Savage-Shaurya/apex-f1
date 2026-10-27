@@ -11,6 +11,9 @@ import { HERO_SLIDE_MS, autoAdvances, stepSlide, type HeroSlide } from './news-h
 const pad = (n: number) => String(n).padStart(2, '0');
 const EASE = [0.22, 1, 0.36, 1] as const;
 const noSubscribe = () => () => {};
+/** True once the window load event has fired (all first-view resources, the first photo included). */
+const onPageLoad = (done: () => void) => { window.addEventListener('load', done); return () => window.removeEventListener('load', done); };
+const pageLoaded = () => document.readyState === 'complete';
 
 /**
  * The home hero's rotating news desk: the newest real Formula 1 stories,
@@ -33,6 +36,7 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
   const [onScreen, setOnScreen] = useState(true);
   // False in the server HTML and during hydration, true after: the next picture never competes with the LCP.
   const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
+  const loaded = useSyncExternalStore(onPageLoad, pageLoaded, () => false);
   const [failed, setFailed] = useState<ReadonlySet<number>>(() => new Set());
   // The server cannot know the preference: the hydrating render must match its markup, so the
   // preference applies from the first render after hydration (a reduced-motion visitor saw a
@@ -114,8 +118,9 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
             )}
           </m.div>
         </AnimatePresence>
-        {/* The next picture loads behind the current one, so the crossfade never waits on the network. */}
-        {hydrated && count > 1 && !failed.has(next) && (
+        {/* The next picture loads behind the current one, so the crossfade never waits on the network.
+            It starts after the page load, so it never competes with the first photo (LCP). */}
+        {hydrated && loaded && count > 1 && !failed.has(next) && (
           <div key={`pre-${next}`} className="pointer-events-none absolute inset-0 opacity-0">
             <SmartImage src={slides[next]!.image} alt="" sizes="100vw" fit="cover" allowUpscale focal="50% 30%" className="absolute inset-0" onFail={() => markFailed(next)} />
           </div>

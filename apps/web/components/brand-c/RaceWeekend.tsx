@@ -4,6 +4,7 @@ import type { BrandCData, SessionRow } from './data';
 import { CircuitStreak } from './CircuitStreak';
 import { Countdown, ViewerTime, ZoneClock } from './live';
 import { utcLabel } from '@/components/home/weekend';
+import { bestRendition } from '@/lib/image-renditions';
 
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 
@@ -35,6 +36,8 @@ export function RaceWeekend({ data }: { data: BrandCData }) {
       </section>
     );
   }
+  // A phone takes the 500 px bucket (~54 KB) instead of the 1920 px photo (~480 KB).
+  const photo = n.photo ? bestRendition(n.photo.src) : null;
   const first = n.sessions[0]?.iso;
   const dates = first ? `${dayFmt.format(Date.parse(first))} – ${dayFmt.format(Date.parse(n.raceIso))}` : null;
   return (
@@ -108,8 +111,8 @@ export function RaceWeekend({ data }: { data: BrandCData }) {
         {n.photo && (
           <figure data-rv className="relative mt-6 overflow-hidden rounded-[22px] ring-1 ring-[color:var(--bc-rule)]">
             <div className="relative aspect-[3/2] bg-[color:var(--bc-carbon-2)]">
-              {/* eslint-disable-next-line @next/next/no-img-element -- Commons thumbnail bucket chosen upstream; box reserves the space */}
-              <img src={n.photo.src} alt={`${n.circuitName}, ${n.place}`} loading="lazy" decoding="async" data-zoom className="absolute inset-0 h-full w-full object-cover" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- Commons thumbnail buckets (bestRendition); box reserves the space */}
+              <img src={photo!.src} srcSet={photo!.srcSet} sizes="(min-width: 1440px) 1360px, 100vw" alt={`${n.circuitName}, ${n.place}`} loading="lazy" decoding="async" data-zoom className="absolute inset-0 h-full w-full object-cover" />
               <div aria-hidden className="absolute inset-0 hidden bg-[linear-gradient(180deg,transparent_40%,rgb(5_5_6/0.9))] sm:block" />
             </div>
             {/* Phones: the caption sits under the photo on the card (never on bright sky); wider: on the dark foot of the photo.
