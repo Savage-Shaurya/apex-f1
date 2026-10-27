@@ -59,3 +59,18 @@ test('unknown privacy is an invalid details snapshot and cannot hide an existing
   assert.equal(setup.calls.includes('reconcile'), false);
   assert.equal(report.totals.videosMarkedUnavailable, 0);
 });
+
+test('a stored video from a channel no longer curated is marked unavailable instead of failing every run', async () => {
+  // Production 2026-10-27: stored RAFA TV uploads (channel dropped from the list) failed each scheduled run.
+  const setup = fixture();
+  setup.deps.videoDetails = async () => [publicVideo(), { ...publicVideo('lmnopqrstuv'), channelId: 'dropped' }, publicVideo('wxyz1234567')];
+  setup.deps.reconcile = async (snapshot) => {
+    setup.calls.push('reconcile');
+    assert.deepEqual(snapshot.publicVideos.map((v) => v.videoId), ['abcdefghijk', 'wxyz1234567']);
+    assert.deepEqual(snapshot.unavailableVideoIds, ['lmnopqrstuv']);
+    return { persisted: 2, unavailable: 1 };
+  };
+  const report = await syncRecentYouTubeUploads(setup.deps);
+  assert.equal(report.ok, true);
+  assert.equal(report.totals.videosMarkedUnavailable, 1);
+});

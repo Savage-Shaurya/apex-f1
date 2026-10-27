@@ -116,10 +116,14 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
       const allowed = new Set(
         deps.channels.map((channel) => channel.channelId),
       );
+      // A recent upload must come from a curated channel. A stored video re-checked here may
+      // belong to a channel dropped from the list since: it is no longer shown (marked
+      // unavailable below), not a reason to fail every run.
+      const recent = new Set(recentIds);
       if (
         videos.some(
           (video) =>
-            !ids.includes(video.videoId) || !allowed.has(video.channelId) || !['public', 'private', 'unlisted'].includes(video.privacyStatus),
+            !ids.includes(video.videoId) || (recent.has(video.videoId) && !allowed.has(video.channelId)) || !['public', 'private', 'unlisted'].includes(video.privacyStatus),
         ) ||
         new Set(videos.map((video) => video.videoId)).size !== videos.length
       )
@@ -133,8 +137,9 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
     }
   }
   // Removed/private uploads may be absent from videos.list; never fabricate their details.
+  const curated = new Set(deps.channels.map((channel) => channel.channelId));
   const publicVideos = videos.filter(
-    (video) => video.privacyStatus === "public",
+    (video) => video.privacyStatus === "public" && curated.has(video.channelId),
   ).map((video) => ({ ...video, channelName: video.channelTitle }));
   let videosPersisted = 0;
   let videosMarkedUnavailable = 0;
