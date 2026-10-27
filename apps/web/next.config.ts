@@ -64,6 +64,11 @@ const nextConfig: NextConfig = {
     const enforcedPolicy = contentSecurityPolicy(process.env);
 
     return [
+      // Versioned display face (components/shell/display-face.ts): the name changes with the file.
+      {
+        source: '/fonts/:file*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
       {
         source: '/(.*)',
         headers: [

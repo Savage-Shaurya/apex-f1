@@ -6,7 +6,8 @@ font CDN. No Formula 1 proprietary typeface is used or imitated.
 
 | File | Role | Upstream master (google/fonts, `ofl/`) | Upstream SHA-256 |
 |---|---|---|---|
-| `anybody-wdth-wght.woff2` | Display (wdth 50-150, wght 100-900) | `anybody/Anybody[wdth,wght].ttf` | `b184bd7e6ca8348bbaecec98951565729d7e89b7872d4898a1f9981342b5b64c` |
+| `../../public/fonts/anybody-wdth-wght-v1.woff2` | Display (wdth 50-150, wght 100-900); a public file preloaded on every route except home (`components/shell/display-face.ts`), declared in `globals.css` | `anybody/Anybody[wdth,wght].ttf` | `b184bd7e6ca8348bbaecec98951565729d7e89b7872d4898a1f9981342b5b64c` |
+| `anybody-wordmark.woff2` | Header wordmark only: Anybody pinned at wght 850 / wdth 138, letters A P E X (both cases), ~2 KB, preloaded on every route | `anybody/Anybody[wdth,wght].ttf` | same as above |
 | `hanken-grotesk-var.woff2` | Text and UI (wght 100-900, figures are tabular by default) | `hankengrotesk/HankenGrotesk[wght].ttf` | `813b3f8fa0965405669a89b38e51bbefd95eef6b8e20d1cb2d8c10cce062662f` |
 | `hanken-grotesk-italic-var.woff2` | Real emphasis inside running text | `hankengrotesk/HankenGrotesk-Italic[wght].ttf` | `ae5731726ff75301a3cb63f2e98d1babc77d55ab09fb8e229ca75f5bd46fbe32` |
 | `eb-garamond-400.woff2` | Editorial voice: article standfirst and pull quotes (wght pinned at 400) | `ebgaramond/EBGaramond[wght].ttf` | `ef9512f92f6d579e5dc75af59a5a4b1b8b47d2eda89e00b954d44520e5369027` |

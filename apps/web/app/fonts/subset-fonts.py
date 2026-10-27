@@ -26,10 +26,15 @@ UNICODES = (
 )
 FEATURES = "kern,liga,clig,calt,ccmp,locl,mark,mkmk,case,frac,numr,dnom,sups,tnum,pnum,lnum,onum,ss01,ss02,ss03"
 
-# (upstream, output, pinned axes). Accent faces are pinned to the one weight the
+# (upstream, output, pinned axes[, exact text]). Accent faces are pinned to the one weight the
 # design system uses, which keeps them small; the two working faces stay variable.
+# The header wordmark gets its own face: Anybody pinned at the instance the wordmark is
+# set in (weight 850, width 138%) holding only its letters, so every page preloads ~2 KB
+# for it instead of the 80 KB variable display face (home performance, 2026-10-27).
 JOBS = [
-    ("Anybody[wdth,wght].ttf", "anybody-wdth-wght.woff2", None),
+    ("Anybody[wdth,wght].ttf", "anybody-wordmark.woff2", {"wght": 850, "wdth": 138}, "APEXapex"),
+    # Served from public/fonts (per-route preload); bump -vN when it changes (immutable cache).
+    ("Anybody[wdth,wght].ttf", "../../public/fonts/anybody-wdth-wght-v1.woff2", None),
     ("HankenGrotesk[wght].ttf", "hanken-grotesk-var.woff2", None),
     ("HankenGrotesk-Italic[wght].ttf", "hanken-grotesk-italic-var.woff2", None),
     ("EBGaramond[wght].ttf", "eb-garamond-400.woff2", {"wght": 400}),
@@ -41,7 +46,7 @@ JOBS = [
 def main(src_dir: str) -> None:
     src = Path(src_dir)
     out = Path(__file__).resolve().parent
-    for upstream, target, pin in JOBS:
+    for upstream, target, pin, *text in JOBS:
         options = subset.Options()
         options.flavor = "woff2"
         options.layout_features = FEATURES.split(",")
@@ -54,7 +59,10 @@ def main(src_dir: str) -> None:
         if pin:
             font = instancer.instantiateVariableFont(font, pin)
         sub = subset.Subsetter(options)
-        sub.populate(unicodes=subset.parse_unicodes(UNICODES))
+        if text:
+            sub.populate(text=text[0])
+        else:
+            sub.populate(unicodes=subset.parse_unicodes(UNICODES))
         sub.subset(font)
         font.flavor = "woff2"
         font.save(out / target)

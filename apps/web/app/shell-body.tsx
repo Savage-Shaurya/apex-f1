@@ -5,6 +5,7 @@ import { VideoPlayerModal } from '@/components/video/VideoPlayerModal';
 import { ConsentBanner } from '@/components/ds/shell/ConsentBanner';
 import { SiteFooterServer, SiteHeaderServer } from '@/components/ds/shell/server';
 import { analyticsConfigured } from '@/lib/analytics-config';
+import { DisplayFacePreload } from '@/components/shell/DisplayFacePreload';
 
 /**
  * The site shell inside <body>: skip link, consent banner (first in the tab
@@ -16,6 +17,8 @@ export function ShellBody({ children }: { children: ReactNode }) {
   return (
     <MotionPreferencesProvider>
       <ScrollProvider>
+        {/* The display face's per-route preload (renders nothing; see components/shell/display-face.ts). */}
+        <DisplayFacePreload />
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[100] focus:inline-flex focus:min-h-11 focus:items-center focus:bg-brand-red focus:px-5 focus:font-text focus:text-ui focus:font-[650] focus:text-white"

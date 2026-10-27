@@ -3,6 +3,28 @@
 @import '../components/ds/portrait.css';
 @plugin '@tailwindcss/typography';
 
+/* Display face: the full Anybody variable font (wdth 50-150, wght 100-900, OFL). A public,
+ * versioned file so it can be preloaded per route (components/shell/display-face.ts: every
+ * route but home). The fallback face keeps the metrics next/font generated for it, so text
+ * set before the face arrives takes the same room. */
+@font-face {
+  font-family: 'Anybody Display';
+  src: url('/fonts/anybody-wdth-wght-v1.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-stretch: 50% 150%;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Anybody Display Fallback';
+  src: local('Arial');
+  ascent-override: 84.66%;
+  descent-override: 25.56%;
+  line-gap-override: 0%;
+  size-adjust: 93.91%;
+}
+:root { --font-anybody: 'Anybody Display', 'Anybody Display Fallback'; }
+
 /* ==========================================================================
  * APEX design system · "Programme & Timing Sheet"
  * Direction and rules: the dev-only /design route renders every token and primitive
@@ -362,6 +384,8 @@ em, i, cite { font-family: var(--font-hanken-italic), var(--font-text); font-sty
  * 4. Type roles and utilities
  * ------------------------------------------------------------------------ */
 .font-display { font-family: var(--font-display); }
+/* The header wordmark's own ~2 KB cut of Anybody (app/layout.tsx), then the full display face. */
+.font-wordmark { font-family: var(--font-anybody-wordmark), var(--font-display); }
 .font-headline { font-family: var(--font-display); }
 .font-text, .font-body { font-family: var(--font-text); }
 .font-editorial { font-family: var(--font-editorial); }
