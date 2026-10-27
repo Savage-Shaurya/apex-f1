@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ProviderError, requestJson, untrackedFetch, withProviderDeadline } from "../transport";
 import { scopedRedisKey } from "../redis-scope";
+import { isBuildPhase } from "../build-phase";
 
 export interface JolpicaRedisConfig {
   url: string;
@@ -28,6 +29,17 @@ export const JOLPICA_REDIS_PREFIX = "apex:jolpica:v1:{jolpica}";
 /** This process's prefix: the production keys only on the production deployment (redis-scope.ts). */
 export function jolpicaRedisPrefix(env: Readonly<Record<string, string | undefined>> = process.env): string {
   return scopedRedisKey(JOLPICA_REDIS_PREFIX, env);
+}
+/**
+ * The request budget's prefix (quota, start gap, leases, backoff). `next build` runs on other
+ * machines than the live functions and gets its own budget: three production prerenders in one
+ * hour spent the live site's 500 starts and its uncached pages answered 500 (2026-10-27).
+ * Snapshots and last-good copies stay shared (jolpicaRedisPrefix).
+ */
+export function jolpicaAdmissionPrefix(env: Readonly<Record<string, string | undefined>> = process.env): string {
+  const prefix = jolpicaRedisPrefix(env);
+  if (!isBuildPhase(env)) return prefix;
+  return prefix.replace(/^apex:(?:([a-z0-9-]+):)?jolpica:/, (_, scope?: string) => `apex:${scope ? `${scope}-` : ""}build:jolpica:`);
 }
 const SCOPE_LABEL = /^[a-z0-9-]{1,40}$/;
 function backoffKey(prefix: string, scope: string | undefined): string {
@@ -152,7 +164,7 @@ export function createJolpicaSharedAdmission(
     env?: Readonly<Record<string, string | undefined>>;
   } = {},
 ): JolpicaSharedAdmission {
-  const prefix = options.prefix ?? jolpicaRedisPrefix(options.env);
+  const prefix = options.prefix ?? jolpicaAdmissionPrefix(options.env);
   if (!/^apex:(?:[a-z0-9-]{1,48}:)?jolpica:v1:\{jolpica(?:-[a-z0-9-]{1,100})?\}$/.test(prefix))
     throw new ProviderError("jolpica", "invalid-input");
   const execute = createJolpicaRedisTransport(config, options);

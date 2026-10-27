@@ -87,6 +87,8 @@ export function defaultJolpicaLastGoodStore(env: Readonly<Record<string, string 
 export function jolpicaKeyIsImmutable(key: string, now = Date.now()): boolean {
   let path: string;
   try { path = new URL(key).pathname; } catch { return false; }
+  // One driver, constructor or circuit record (name, birth date, nationality) does not change.
+  if (/\/(?:drivers|constructors|circuits)\/[a-z0-9_]+\.json$/.test(path) && !/\/(?:19|20)\d{2}\/|\/current\//.test(path)) return true;
   const year = new Date(now).getUTCFullYear();
   const season = path.match(/\/((?:19|20)\d{2})(?:\/|\.json)/);
   return Boolean(season && Number(season[1]) < year);
