@@ -144,7 +144,7 @@ export function SiteFooter({
       </div>
 
       <div aria-hidden className="ds-container pb-2">
-        <Wordmark size="xl" className="w-full text-surface-3" />
+        <Wordmark size="xl" className="w-full text-fg" />
       </div>
     </Root>
   );
