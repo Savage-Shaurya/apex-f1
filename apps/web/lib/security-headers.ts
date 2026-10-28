@@ -3,8 +3,10 @@ const POSTHOG_DEFAULT = 'https://app.posthog.com';
 const POSTHOG_CLOUD = ['https://app.posthog.com', 'https://us.i.posthog.com', 'https://eu.i.posthog.com', 'https://us-assets.i.posthog.com', 'https://eu-assets.i.posthog.com'];
 const DNS_NAME = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 export const VIDEO_FRAME_ORIGINS = ['https://www.youtube-nocookie.com', 'https://www.youtube.com'] as const;
-/** The owner's studio site may frame the public pages (owner decision 2026-10-29); admin stays 'none'. */
-export const EMBED_ANCESTORS = ['https://snappycrew.com', 'https://www.snappycrew.com'] as const;
+/** The owner's studio site may frame the public pages (owner decision 2026-10-29), plus its local
+ * preview server on the owner's Mac (localhost:4131) so the case study can be reviewed before it ships;
+ * admin stays 'none'. */
+export const EMBED_ANCESTORS = ['https://snappycrew.com', 'https://www.snappycrew.com', 'http://localhost:4131'] as const;
 
 /** A privately configured self-hosted analytics origin is allowed explicitly. */
 export function posthogResourceOrigin(value: string | undefined): string {

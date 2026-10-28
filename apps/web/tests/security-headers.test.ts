@@ -43,5 +43,5 @@ test('explicit analytics hosting adds only its canonical origin and invalid valu
 test('only the owner studio may frame public pages; the default policy stays unframeable', () => {
   assert.deepEqual(directives(contentSecurityPolicy({ NODE_ENV: 'production' })).get('frame-ancestors'), ["'none'"]);
   assert.deepEqual(directives(contentSecurityPolicy({ NODE_ENV: 'production' }, { embeddable: true })).get('frame-ancestors'),
-    ["'self'", 'https://snappycrew.com', 'https://www.snappycrew.com']);
+    ["'self'", 'https://snappycrew.com', 'https://www.snappycrew.com', 'http://localhost:4131']);
 });
