@@ -7,7 +7,7 @@ import { withSocial } from '@/lib/page-metadata';
 
 export const metadata: Metadata = withSocial({
   title: 'Contact Apex',
-  description: 'Contact Apex: corrections and tips, collaboration, copyright notices and security reports. One person, one inbox.',
+  description: 'Contact Apex: corrections and tips, collaboration, copyright notices and security reports. One inbox.',
   alternates: { canonical: '/contact' },
 });
 
@@ -52,7 +52,7 @@ export default function ContactPage() {
             <div className="lg:sticky lg:top-[calc(var(--nav-offset)+2rem)]">
               <Heading level={1} size="display-l" id="contact-title">Contact</Heading>
               <Text editorial size="lead" className="mt-8 max-w-[30ch]">
-                Apex is built and run by one person, so every message lands in the same inbox.
+                Apex is built and run by Snappy Crew, and every message lands in the same inbox.
               </Text>
               <div className="mt-10">
                 <Label as="p">The inbox</Label>

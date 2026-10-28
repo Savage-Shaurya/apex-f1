@@ -173,7 +173,7 @@ export default async function ReferencesPage() {
           </div>
           <div className="grid min-w-0 gap-6 lg:col-span-7">
             <p className="bc-serif text-[clamp(1.35rem,1.1rem+1vw,1.9rem)] leading-[1.3] text-white">
-              {BRAND_STATEMENT} A fan concept, made by one person, with no commercial relationship to the sport.
+              {BRAND_STATEMENT} A fan concept, built by Snappy Crew, with no commercial relationship to the sport.
             </p>
             <p className="max-w-[64ch] text-[1.05rem] leading-relaxed text-white">{NON_AFFILIATION_STATEMENT}</p>
             <p className="max-w-[64ch] leading-relaxed text-[color:var(--bc-silver)]">{TRADEMARK_NOTICE}</p>

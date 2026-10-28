@@ -107,7 +107,7 @@ export default function SupportPage() {
             </span>
           </h1>
           <p className="bc-in-up mx-auto mt-9 max-w-[54ch] text-pretty text-[clamp(1.075rem,0.98rem+0.45vw,1.3rem)] leading-[1.6] text-[color:var(--bc-white)]" style={delay(480)}>
-            Apex has never asked you for anything. It is made and paid for by one person, with no ads, no paywall, no team money
+            Apex has never asked you for anything. It is made and paid for by Snappy Crew, with no ads, no paywall, no team money
             and no tip jar. But if a result, the championship archive or a driver’s story ever brightened your day, I would love
             you to pass that feeling on to an animal near you, one who cannot ask for help. Then tell me about it. I genuinely
             want to see it.

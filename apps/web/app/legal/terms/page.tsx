@@ -25,7 +25,7 @@ export default function TermsPage() {
       updated="2026-10-26"
       intro={
         <p>
-          These terms apply when you use Apex. Apex is an independent, unofficial Formula 1 fan website built and run by Shaurya Punj.
+          These terms apply when you use Apex. Apex is an independent, unofficial Formula 1 fan website built and run by Snappy Crew, the studio founded by Shaurya Punj.
           By using the site you agree to these terms. If you do not agree, please do not use Apex.
         </p>
       }
@@ -106,7 +106,7 @@ export default function TermsPage() {
               <li>Videos are embedded from YouTube and remain the property of their channels.</li>
               <li>Photographs belong to their photographers, publishers or licensors and are credited where shown.</li>
               <li>Statistics are compiled from public data sources listed on the <Link href="/references">References</Link> page.</li>
-              <li>The Apex name, design, site text and code are the work of Shaurya Punj.</li>
+              <li>The Apex name, design, site text and code are the work of Snappy Crew.</li>
             </ul>
           ),
         },

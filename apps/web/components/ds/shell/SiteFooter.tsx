@@ -123,7 +123,15 @@ export function SiteFooter({
         {/* Legal line */}
         <div className="flex flex-col gap-4 py-6 shadow-[inset_0_1px_0_var(--rule)] lg:flex-row lg:items-center lg:justify-between lg:gap-8">
           <p className="font-text text-small tracking-[0.01em] text-fg-3">
-            © {year} Apex
+            © {year} Apex · Built by{' '}
+            <a
+              href="https://snappycrew.com"
+              target="_blank"
+              rel="noopener"
+              className="inline-flex min-h-11 items-center font-[650] text-fg-2 underline decoration-[var(--rule-strong)] underline-offset-[0.2em] transition-colors hover:text-fg hover:decoration-[var(--accent-text)]"
+            >
+              Snappy Crew
+            </a>
           </p>
           <ul aria-label="Legal" className="-mx-2 flex flex-wrap items-center">
             {legalLinks().map((l) => (

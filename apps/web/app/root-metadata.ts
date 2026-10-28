@@ -16,9 +16,9 @@ export const rootMetadata: Metadata = {
   },
   description: DESCRIPTION,
   applicationName: SITE,
-  authors: [{ name: 'Shaurya Punj', url: 'https://shauryapunj.com' }],
-  creator: 'Shaurya Punj',
-  publisher: 'Shaurya Punj',
+  authors: [{ name: 'Snappy Crew', url: 'https://snappycrew.com' }, { name: 'Shaurya Punj', url: 'https://shauryapunj.com' }],
+  creator: 'Snappy Crew',
+  publisher: 'Snappy Crew',
   keywords: ['Formula 1', 'F1', 'Grand Prix', 'race results', 'session timing', 'driver standings'],
   openGraph: {
     type: 'website',

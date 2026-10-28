@@ -12,16 +12,17 @@ import { withSocial } from '@/lib/page-metadata';
 export const metadata: Metadata = withSocial({
   title: 'About Apex: an independent, fan-built Formula 1 platform',
   description:
-    'Apex is an independent, fan-built Formula 1 platform made by one person, Shaurya Punj: the calendar, results, the championship archive back to 1950, final session timing and the latest news, in one place.',
+    'Apex is an independent, fan-built Formula 1 platform built by Snappy Crew, the studio founded by Shaurya Punj: the calendar, results, the championship archive back to 1950, final session timing and the latest news, in one place.',
   alternates: { canonical: '/about' },
 });
 
 const CREATOR = {
-  name: 'Shaurya Punj',
-  role: 'AI/ML and agentic software engineer',
+  name: 'Snappy Crew',
+  role: 'Automation, software, websites and motion studio, founded by Shaurya Punj',
   location: 'India',
   links: [
-    { label: 'Portfolio', href: 'https://shauryapunj.com' },
+    { label: 'Snappy Crew', href: 'https://snappycrew.com' },
+    { label: 'Shaurya Punj', href: 'https://shauryapunj.com' },
     ...SOCIAL_LINKS.map((l) => ({ label: l.id === 'email' ? l.handle : l.label, href: l.href })),
   ],
 } as const;
@@ -59,7 +60,7 @@ export default async function AboutPage() {
           <div className="col-span-4 min-w-0 sm:col-span-8 lg:col-span-8">
             <Heading level={1} size="display-l" id="about-title">About Apex</Heading>
             <Text editorial size="lead" className="mt-8 max-w-[34ch] text-[clamp(1.375rem,1.1rem+1.2vw,2rem)] leading-[1.38]">
-              Apex is an independent Formula 1 platform, made by one person for everyone who loves the sport.
+              Apex is an independent Formula 1 platform, built by Snappy Crew for everyone who loves the sport.
             </Text>
           </div>
           <div className="col-span-4 min-w-0 sm:col-span-8 lg:col-span-4 lg:self-end">
@@ -74,7 +75,7 @@ export default async function AboutPage() {
           {active && <Stat label="Seasons in the archive" value={active - 1949} note={`1950 to ${active}`} />}
           {races !== null && <Stat label={`Rounds in ${calendar!.season}`} value={races} note={done !== null ? `${done} run so far` : undefined} />}
           {standings.length > 0 && <Stat label="Drivers classified" value={standings.length} note={active ? `${active} championship` : undefined} />}
-          <Stat label="People behind it" value="1" note="No team, no agency" />
+          <Stat label="Built by" value="Snappy Crew" note="Founded by Shaurya Punj" />
         </StatGroup>
       </Section>
 
@@ -97,8 +98,9 @@ export default async function AboutPage() {
             <Heading level={2} size="display-m" id="maker-title" className="mt-4">{CREATOR.name}</Heading>
             <p className="mt-3 font-text text-heading-s text-fg-2">{CREATOR.role}, {CREATOR.location}</p>
             <Text className="mt-6" measure>
-              Apex is designed, built and looked after by one person. No team, no agency, no outside investors. If you spot a wrong
-              result or something that does not work, it lands in one inbox, and it gets read.
+              Apex is designed, built and looked after by Snappy Crew, the studio Shaurya Punj founded. No outside investors. If you
+              spot a wrong result or something that does not work, it lands in one inbox, and it gets read. Need automation, a
+              website or motion work of your own? That is what Snappy Crew does.
             </Text>
           </div>
           <ul className="col-span-4 min-w-0 self-end sm:col-span-8 lg:col-span-4 lg:col-start-9">

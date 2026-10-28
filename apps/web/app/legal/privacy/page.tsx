@@ -31,7 +31,7 @@ export default function PrivacyPage() {
       intro={
         <p>
           This policy explains how Apex (&ldquo;Apex&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) handles personal data when you use this
-          website. Apex is an independent, unofficial Formula 1 fan project built and run by one person, Shaurya Punj, based in India.
+          website. Apex is an independent, unofficial Formula 1 fan project built and run by Snappy Crew, the studio founded by Shaurya Punj, based in India.
           Apex has no user accounts and asks for personal data in only two places: the newsletter and predictions.
         </p>
       }
