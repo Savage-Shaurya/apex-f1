@@ -62,6 +62,12 @@ const nextConfig: NextConfig = {
 
   async headers() {
     const enforcedPolicy = contentSecurityPolicy(process.env);
+    // Public pages may be framed by snappycrew.com only; admin and its API keep 'none' + DENY (rules below win).
+    const publicPolicy = contentSecurityPolicy(process.env, { embeddable: true });
+    const lockedFrame = [
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'Content-Security-Policy', value: enforcedPolicy },
+    ];
 
     return [
       // Versioned display face (components/shell/display-face.ts): the name changes with the file.
@@ -73,7 +79,6 @@ const nextConfig: NextConfig = {
         source: '/(.*)',
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           // Force HTTPS for 2y incl. subdomains (Vercel terminates TLS).
           {
@@ -88,10 +93,13 @@ const nextConfig: NextConfig = {
           { key: 'X-DNS-Prefetch-Control', value: 'on' },
           {
             key: 'Content-Security-Policy',
-            value: enforcedPolicy,
+            value: publicPolicy,
           },
         ],
       },
+      { source: '/admin', headers: lockedFrame },
+      { source: '/admin/:path*', headers: lockedFrame },
+      { source: '/api/admin/:path*', headers: lockedFrame },
     ];
   },
 };

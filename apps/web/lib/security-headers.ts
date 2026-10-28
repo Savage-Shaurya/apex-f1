@@ -3,6 +3,8 @@ const POSTHOG_DEFAULT = 'https://app.posthog.com';
 const POSTHOG_CLOUD = ['https://app.posthog.com', 'https://us.i.posthog.com', 'https://eu.i.posthog.com', 'https://us-assets.i.posthog.com', 'https://eu-assets.i.posthog.com'];
 const DNS_NAME = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 export const VIDEO_FRAME_ORIGINS = ['https://www.youtube-nocookie.com', 'https://www.youtube.com'] as const;
+/** The owner's studio site may frame the public pages (owner decision 2026-10-29); admin stays 'none'. */
+export const EMBED_ANCESTORS = ['https://snappycrew.com', 'https://www.snappycrew.com'] as const;
 
 /** A privately configured self-hosted analytics origin is allowed explicitly. */
 export function posthogResourceOrigin(value: string | undefined): string {
@@ -26,14 +28,14 @@ export function posthogResourceOrigin(value: string | undefined): string {
  * nonce with 'strict-dynamic' would make every page dynamic (no ISR). Revisit
  * if user-generated HTML or a third-party inline snippet is ever added.
  */
-export function contentSecurityPolicy(environment: Record<string, string | undefined>): string {
+export function contentSecurityPolicy(environment: Record<string, string | undefined>, { embeddable = false }: { embeddable?: boolean } = {}): string {
   const development = environment.NODE_ENV === 'development' && !environment.VERCEL && !environment.VERCEL_ENV;
   const analytics = [...new Set([...POSTHOG_CLOUD, posthogResourceOrigin(environment.NEXT_PUBLIC_POSTHOG_HOST)])];
   return [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
-    "frame-ancestors 'none'",
+    embeddable ? `frame-ancestors 'self' ${EMBED_ANCESTORS.join(' ')}` : "frame-ancestors 'none'",
     "form-action 'self'",
     `script-src 'self' 'unsafe-inline'${development ? " 'unsafe-eval'" : ''} ${analytics.join(' ')}`,
     "style-src 'self' 'unsafe-inline'",
