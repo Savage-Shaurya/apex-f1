@@ -3,6 +3,7 @@ import { runLeasedJob, JobBudgetError, type JobContext, type Lease, type LeaseSt
 import { describeError } from '../../workers/src/lib/describe-error';
 import { buildReport, isAuthorizedCronRequest, logReport } from './cron-auth';
 import { logEvent } from './log';
+import { defaultCronStatusStore, finalizeCronResponse, type CronStatusStore } from './cron-outcome';
 
 const store: LeaseStore = { claim: claimJobLease, renew: renewJobLease, release: releaseJobLease };
 const BUDGET_MS = 45_000;
@@ -37,6 +38,11 @@ export interface LeasedCronOptions {
    * Such a report is returned instead of a bare 503 that loses the progress.
    */
   partialOnBudget?: boolean;
+  /**
+   * Where each route's last successful run is kept (cron-outcome.ts). Defaults
+   * to this process plus Upstash when configured; null disables it.
+   */
+  statusStore?: CronStatusStore | null;
 }
 
 /** Header a task sets on a report that stopped, honestly, at the time budget. */
@@ -84,6 +90,11 @@ export async function runLeasedCron(
   const recorder = options.recorder === undefined ? (options.store ? null : databaseCronRecorder) : options.recorder;
 
   const optional = options.lease === 'optional';
+  // Every report the task returns: an ok report records the run's success, and a
+  // provider-unavailable report says when the last success was (cron-outcome.ts).
+  const statusStore = options.statusStore === undefined ? defaultCronStatusStore() : options.statusStore;
+  const work = task;
+  task = async (context) => finalizeCronResponse(route, await work(context), statusStore);
   /** Cache-only work without a durable owner: budget and cancellation, no lease. */
   const runUnleased = async (label: string): Promise<Response> => {
     const { context, dispose } = unleasedContext(route, request.signal);

@@ -5,16 +5,18 @@ import { createHash } from 'node:crypto';
 const expectedVercel = new Map([['jolpica-nightly','0 3 * * *'],['youtube-sync','0 4 * * *'],['newsletter-blast','0 6 * * 5']]);
 // [route, workflow]: jolpica-nightly also has GitHub catch-up runs that continue deferred rounds
 // (--until-complete, hence a longer job timeout); weekend-watch makes race-weekend results appear on
-// their own; youtube-sync adds two-hourly video refreshes to the daily hosting run.
+// their own; youtube-sync adds two-hourly video refreshes to the daily hosting run. Weather, weekend
+// and season jobs retry a provider outage in-run (scripts/invoke-cron.mjs, up to 8 minutes), hence
+// their 10/10/15-minute timeouts (cron resilience, 2026-10-31).
 const expectedGithub = [
   ['rss-sync',{file:'refresh-news.yml',schedules:['2,32 * * * *'],timeout:3}],
-  ['weather-sync',{file:'refresh-weather.yml',schedules:['17 * * * *'],timeout:3}],
-  ['jolpica-nightly',{file:'refresh-season.yml',schedules:['35 3-5 * * *'],timeout:10}],
-  ['weekend-watch',{file:'refresh-weekend.yml',schedules:['4-54/10 * * * 5,6,0','4-54/10 0-6 * * 1'],timeout:3}],
+  ['weather-sync',{file:'refresh-weather.yml',schedules:['17 * * * *'],timeout:10}],
+  ['jolpica-nightly',{file:'refresh-season.yml',schedules:['35 3-5 * * *'],timeout:15}],
+  ['weekend-watch',{file:'refresh-weekend.yml',schedules:['4-54/10 * * * 5,6,0','4-54/10 0-6 * * 1'],timeout:10}],
   ['youtube-sync',{file:'refresh-videos.yml',schedules:['41 */2 * * *'],timeout:3}],
 ];
 // Reviewed full workflow bytes: extra schedules, steps or permissions require review.
-const workflowHashes=new Map([['refresh-news.yml','6dfdfc8537c500c24185f9f6f0edd8086ad6967ef537e79d2b28ecec3853fb92'],['refresh-weather.yml','4b8e9b5f47dfa7cdd99c8c627a9aed0d21712d244a1009aa0a6b48a55b8abbde'],['refresh-season.yml','715251151884c4205bcee5c91b517f3a7121925dfa6ce010174c42e82d782cd1'],['refresh-weekend.yml','3a1a06bcd6b6a8456469c32d16ee780e924393563d9ea48f156bf288f867dc7c'],['refresh-videos.yml','5e6cc289acd69e88f95b41b848fff4569d4c929b4251f639e0c520e7c907dbc9']]);
+const workflowHashes=new Map([['refresh-news.yml','6dfdfc8537c500c24185f9f6f0edd8086ad6967ef537e79d2b28ecec3853fb92'],['refresh-weather.yml','843f1c96af2f0b4b9fc748de8ab9647dc4a1d1a47f4ae14c2f6867d90a0f3cda'],['refresh-season.yml','a61e6d85d5e37628c78c827a82ba3e753e3a0e09bdd530edb08e24ef50f7744a'],['refresh-weekend.yml','c35824921866cd633ee7e537c465b6d649357774455976bab61a912dcaf0c307'],['refresh-videos.yml','5e6cc289acd69e88f95b41b848fff4569d4c929b4251f639e0c520e7c907dbc9']]);
 export async function inspectSchedulers(root) {
   const issues=[];
   const vercel=JSON.parse(await readFile(path.join(root,'apps/web/vercel.json'),'utf8'));

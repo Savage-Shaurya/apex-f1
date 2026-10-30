@@ -9,6 +9,14 @@ name: Race weekend results watch
 # APEX_SITE_URL to the HTTPS deployment origin and secret CRON_SECRET to its
 # matching private cron token. GitHub schedules are best effort.
 
+# Provider outages (cron resilience, 2026-10-31; DEPLOY.md "Cron outcomes"):
+# scripts/invoke-cron.mjs retries a provider-unavailable report (HTTP 503,
+# reason "provider-unavailable") and gateway errors up to three times over at
+# most 8 minutes. If the provider is still down, the run ends green with a
+# ::warning:: and a job-summary line while the route's last success is recent
+# (48 h weather/weekend, 72 h season), and red once it is older. Any other
+# failure (auth, configuration, our bug, invalid data) fails red at once.
+
 on:
   schedule:
     - cron: "4-54/10 * * * 5,6,0" # every 10 minutes, Friday to Sunday UTC
@@ -25,7 +33,7 @@ permissions:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

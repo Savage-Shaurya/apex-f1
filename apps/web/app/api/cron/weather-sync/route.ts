@@ -8,12 +8,17 @@
  * Open-Meteo has provider limits and account/usage terms. This is cache priming,
  * limited to the provider's currently supported 14-day forecast horizon.
  *
+ * The calendar barely changes: while Jolpica is unavailable the last validated
+ * copy (up to 7 days old) is used and the report says so (`degraded`,
+ * `results.calendar`). With no copy, or when Open-Meteo is unavailable for
+ * every race, the run answers the provider-unavailable contract (503,
+ * lib/cron-outcome.ts); any other failure stays HTTP 500.
+ *
  * Schedule: hourly via .github/workflows/refresh-weather.yml.
  * Auth: Bearer CRON_SECRET only.
  */
 
 import { NextResponse } from "next/server";
-import { jolpica, mapRace } from "@apex/api-client/jolpica";
 import { openmeteo, raceWeatherDateBounds } from "@apex/api-client/openmeteo";
 import { refreshTagKeepingLastGood } from "@/lib/cache-refresh";
 import {
@@ -24,6 +29,13 @@ import {
 } from "@/lib/cron-auth";
 import { safeErrorMessage } from "@/lib/api-input";
 import { runLeasedCron } from '@/lib/leased-cron';
+import {
+  calendarReport,
+  providerUnavailableResponse,
+  readCronCalendar,
+  unavailableProvider,
+  type CronCalendar,
+} from "@/lib/cron-outcome";
 import type { JobContext } from '../../../../../workers/src/lib/job-control';
 
 export const runtime = "nodejs";
@@ -54,15 +66,13 @@ async function synchronize(req: Request, job: JobContext) {
     end: string;
   }> = [];
   let outsideForecastHorizon = 0;
+  let calendar: CronCalendar;
   try {
-    const races = (
-      await retry(
-        () =>
-          jolpica.getSchedule("current", { revalidate: 3600, strict: true, signal: job.signal, deadlineMs: 15_000 }),
-        { attempts: 2, deadlineMs: Math.min(30_000, job.remainingMs() - 5_000) },
-      )
-    ).map(mapRace);
-    if (!races.length) throw new Error("schedule returned no races");
+    calendar = await retry(
+      () => readCronCalendar({ revalidate: 3600, signal: job.signal, deadlineMs: 15_000 }),
+      { attempts: 2, deadlineMs: Math.min(30_000, job.remainingMs() - 5_000) },
+    );
+    const races = calendar.races;
     const now = Date.now();
     const horizonEnd =
       Date.parse(new Date(now).toISOString().slice(0, 10)) + 15 * 86_400_000;
@@ -84,6 +94,13 @@ async function synchronize(req: Request, job: JobContext) {
         ...raceWeatherDateBounds(r.sessions, r.raceStartIso),
       }));
   } catch (err) {
+    const provider = unavailableProvider([err]);
+    if (provider)
+      return providerUnavailableResponse(start, {
+        route: "weather-sync",
+        provider,
+        error: `schedule fetch failed: ${safeErrorMessage(err)}; no validated calendar copy is available. The next run retries.`,
+      });
     const r = buildReport(start, {
       ok: false,
       route: "weather-sync",
@@ -128,6 +145,7 @@ async function synchronize(req: Request, job: JobContext) {
           slug: r.slug,
           ok: false,
           error: safeErrorMessage(err),
+          cause: err as unknown,
         };
       }
     }),
@@ -150,14 +168,32 @@ async function synchronize(req: Request, job: JobContext) {
     }
   }
 
-  const final = buildReport(start, {
-    ok: reports.every((r) => r.ok),
-    route: "weather-sync",
-    results: { races: reports, count: upcoming.length, outsideForecastHorizon },
-    ...(!upcoming.length
-      ? { skipped: "No upcoming races are within the forecast horizon." }
-      : {}),
-  });
+  const failures = reports.flatMap((r) => (r.ok ? [] : [r.cause]));
+  const races = reports.map((r) => (r.ok ? r : { slug: r.slug, ok: false, error: r.error }));
+  const { degraded: staleCalendar, calendar: calendarSource } = calendarReport(calendar);
+  const results = { races, count: upcoming.length, outsideForecastHorizon, calendar: calendarSource };
+  const forecastProvider = unavailableProvider(failures);
+  // Open-Meteo unavailable for every race: nothing was refreshed, retry later.
+  if (forecastProvider && !reports.some((r) => r.ok))
+    return providerUnavailableResponse(start, {
+      route: "weather-sync",
+      provider: forecastProvider,
+      error: "Forecast provider unavailable for every upcoming race; the last good forecasts stay cached. The next run retries.",
+      results,
+    });
+  // Some forecasts refreshed, the rest failed only because the provider was unavailable: degraded success.
+  const partialOutage = Boolean(forecastProvider);
+  const final = {
+    ...buildReport(start, {
+      ok: failures.length === 0 || partialOutage,
+      route: "weather-sync",
+      results,
+      ...(!upcoming.length
+        ? { skipped: "No upcoming races are within the forecast horizon." }
+        : {}),
+    }),
+    ...(staleCalendar || partialOutage ? { degraded: true } : {}),
+  };
   logReport(final);
   return NextResponse.json(final, { status: final.ok ? 200 : 500 });
 }

@@ -122,8 +122,10 @@ export function createJolpicaRedisTransport(
   )
     throw new ProviderError("jolpica", "configuration");
   return async (command: string[], signal: AbortSignal): Promise<unknown> => {
+    // Labelled apart from Jolpica: an Upstash failure (quota, auth, outage) must
+    // never read as "jolpica: http (HTTP 400)" in a cron report (2026-10-31).
     const result = await requestJson<unknown>(
-      "jolpica",
+      "jolpica-admission",
       config.url,
       {
         method: "POST",

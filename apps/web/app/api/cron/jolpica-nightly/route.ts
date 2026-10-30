@@ -3,6 +3,7 @@ import { invalidateLocalJolpicaSeason } from '@apex/api-client/jolpica';
 import { synchronizeActiveSeasons } from '../../../../../workers/src/lib/season-sync-plan';
 import { PARTIAL_ON_BUDGET_HEADER, runLeasedCron } from '@/lib/leased-cron';
 import { buildReport, logReport } from '@/lib/cron-auth';
+import { providerUnavailableResponse } from '@/lib/cron-outcome';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,10 @@ export async function GET(request: Request) {
         if (plan.finished.includes(year)) for (const path of ['/drivers/champions', '/teams/champions']) revalidatePath(path);
       },
     });
+    const results = { seasons: result.seasons, counts: result.counts, bySeason: result.bySeason, errors: result.errors, warnings: result.warnings };
+    // Failed only because Jolpica was unavailable: committed work stays, the rest is retried (lib/cron-outcome.ts).
+    if (!result.ok && result.providerUnavailable)
+      return providerUnavailableResponse(start, { route: 'jolpica-nightly', provider: 'jolpica', error: 'Season data could not be read while Jolpica F1 is unavailable; previous verified data was kept and the next run retries.', results });
     const report = {
       ...buildReport(start, { ok: result.ok, route: 'jolpica-nightly', results: { seasons: result.seasons, counts: result.counts, bySeason: result.bySeason, errors: result.errors, warnings: result.warnings } }),
       complete: result.complete,

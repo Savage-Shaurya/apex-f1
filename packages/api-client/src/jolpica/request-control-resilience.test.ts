@@ -140,3 +140,35 @@ test('F-01: during the build a read may wait out a queue longer than its 6 s tra
   await assert.rejects(runtime.readThrough(careerPage, 300, { timeoutMs: 96_000 }, rateLimited(40_000)));
   await assert.rejects(runtime.readThrough(careerFirst + '&x=1', 300, { timeoutMs: 96_000 }, async () => 'never'), /rate-limit/);
 });
+
+// Cron resilience (2026-10-31): the calendar barely changes, so a cron job that only needs the
+// schedule may opt into an older validated copy while Jolpica is down, and is told it got one.
+test('a caller may accept an older last-good calendar during an outage, and is told when it is served', async () => {
+  const time = clock(10 * 86_400_000);
+  const lastGood = sharedLastGood();
+  const storedAt = time.state.now - 3 * 86_400_000;
+  lastGood.values.set(schedule, { storedAt, value: { races: ['validated'] } });
+  const control = new JolpicaRequestControl({ now: time.now, sleep: time.sleep, lastGood });
+  const outage = async (): Promise<never> => { throw new ProviderError('jolpica', 'timeout'); };
+  // Pages keep the normal 6 h stale-if-error window: a 3-day-old copy is not served to them.
+  await assert.rejects(control.readThrough(schedule, 3600, { timeoutMs: 1_000 }, outage), /timeout/);
+  const served: number[] = [];
+  const staleFallback = { maxAgeMs: 7 * 86_400_000, onServed: (at: number) => served.push(at) };
+  // Second read hits the remembered failure (no new upstream attempt) and accepts the older copy.
+  assert.deepEqual(await control.readThrough(schedule, 3600, { timeoutMs: 1_000, staleFallback }, outage), { races: ['validated'] });
+  assert.deepEqual(served, [storedAt]);
+  // A fresh control (cold instance) whose own read fails also serves it.
+  const cold = new JolpicaRequestControl({ now: time.now, sleep: time.sleep, lastGood });
+  assert.deepEqual(await cold.readThrough(schedule, 3600, { timeoutMs: 1_000, staleFallback }, outage), { races: ['validated'] });
+  assert.equal(served.length, 2);
+  // Older than the caller's limit: the outage is reported, never an ancient calendar.
+  const tooOld = new JolpicaRequestControl({ now: time.now, sleep: time.sleep, lastGood });
+  await assert.rejects(tooOld.readThrough(schedule, 3600, { timeoutMs: 1_000, staleFallback: { maxAgeMs: 86_400_000, onServed: () => assert.fail('not served') } }, outage), /timeout/);
+});
+
+test('a live read does not report a stale copy', async () => {
+  const time = clock();
+  const control = new JolpicaRequestControl({ now: time.now, sleep: time.sleep, lastGood: sharedLastGood() });
+  const value = await control.readThrough(schedule, 3600, { timeoutMs: 1_000, staleFallback: { maxAgeMs: 86_400_000, onServed: () => assert.fail('live read') } }, async () => ({ live: true }));
+  assert.deepEqual(value, { live: true });
+});

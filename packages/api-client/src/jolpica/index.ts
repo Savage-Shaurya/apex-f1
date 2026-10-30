@@ -3,6 +3,9 @@ export * from "./types";
 export * from "./mappers";
 export * from "./season";
 export * from "./team-stints";
+export type { JolpicaStaleFallback } from "./request-control";
+// Outage classification for jobs that read Jolpica (cron resilience, 2026-10-31).
+export { ProviderError, classifyProviderFailure, isProviderUnavailable, type ProviderFailureClass } from "../transport";
 import { jolpicaRequestControl } from "./request-control";
 import { JOLPICA_BASE } from "./client";
 import { invalidateSharedJolpicaChampionships } from "./shared-admission";

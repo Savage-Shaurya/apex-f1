@@ -5,6 +5,7 @@ import {
 } from '@apex/db';
 import { JobBudgetError, type JobContext } from './job-control';
 import { describeError } from './describe-error';
+import { isProviderUnavailable } from '@apex/api-client/jolpica';
 
 export const currentSeasonOperations = {
   begin: beginSourceObservation, calendar: reconcileRaceCalendar, standings: persistCurrentSeason,
@@ -83,6 +84,12 @@ export async function synchronizeCurrentSeason(year: number, job: JobContext, op
 
 async function synchronizeSeasonSteps(year: number, job: JobContext, operations: Operations, maximumRounds: number, counts: Record<string, number>, errors: string[]) {
   job.assertActive();
+  // Each failure is reported; those caused only by the provider being unavailable are also
+  // counted, so the cron can tell a Jolpica outage from our own failures (2026-10-31).
+  const fail = (label: string, error: unknown) => {
+    errors.push(`${label}: ${errorMessage(error)}`);
+    if (isProviderUnavailable(error)) counts.provider_unavailable_errors = (counts.provider_unavailable_errors ?? 0) + 1;
+  };
   const options = () => jobReadOptions(job);
   const observation = (scope: string) => operations.begin({ source: 'jolpica', scope, jobLease: job.lease, ttlSeconds: Math.max(1, Math.min(120, Math.ceil(job.remainingMs() / 1_000))) });
   const [calendarObservation, standingsObservation] = await Promise.all([observation(`calendar:${year}`), observation(`standings:${year}`)]);
@@ -93,18 +100,18 @@ async function synchronizeSeasonSteps(year: number, job: JobContext, operations:
   rethrowIfBudget(job);
   job.assertActive();
   const schedule = scheduleRead.status === 'fulfilled' ? scheduleRead.value : [];
-  if (scheduleRead.status === 'rejected') errors.push(`calendar: ${errorMessage(scheduleRead.reason)}`);
+  if (scheduleRead.status === 'rejected') fail(`calendar`, scheduleRead.reason);
   else if (!schedule.length) errors.push('calendar: incomplete empty current calendar; no replacement applied.');
   else {
     counts.schedule_rounds = schedule.length;
     if (job.remainingMs() < 10_000) counts.calendar_races_deferred = schedule.length;
     else {
       try { job.assertActive(); Object.assign(counts, await operations.calendar(year, schedule, calendarObservation)); }
-      catch (error) { rethrowIfBudget(job); errors.push(`calendar: ${errorMessage(error)}`); }
+      catch (error) { rethrowIfBudget(job); fail(`calendar`, error); }
     }
   }
-  if (driverRead.status === 'rejected') errors.push(`drivers: ${errorMessage(driverRead.reason)}`);
-  if (teamRead.status === 'rejected') errors.push(`constructors: ${errorMessage(teamRead.reason)}`);
+  if (driverRead.status === 'rejected') fail(`drivers`, driverRead.reason);
+  if (teamRead.status === 'rejected') fail(`constructors`, teamRead.reason);
   if (driverRead.status === 'fulfilled' && teamRead.status === 'fulfilled') {
     try {
       job.assertActive();
@@ -118,12 +125,12 @@ async function synchronizeSeasonSteps(year: number, job: JobContext, operations:
           { driverRound: drivers.round, teamRound: teams.round }, standingsObservation);
         counts.drivers_persisted = saved.drivers; counts.teams_persisted = saved.teams;
       }
-    } catch (error) { rethrowIfBudget(job); errors.push(`standings: ${errorMessage(error)}`); }
+    } catch (error) { rethrowIfBudget(job); fail(`standings`, error); }
   }
   if (schedule.length && job.remainingMs() >= 15_000) {
     let eligible: Awaited<ReturnType<Operations['races']>> = [];
     try { eligible = await operations.races(year); }
-    catch (error) { rethrowIfBudget(job); errors.push(`prediction candidates: ${errorMessage(error)}`); }
+    catch (error) { rethrowIfBudget(job); fail(`prediction candidates`, error); }
     const candidateRounds = [...new Set([...eligible.map((race) => race.round), ...schedule.map((race) => race.round)])];
     let classified: Set<number> | undefined;
     try { classified = new Set(await operations.classified(year)); }
@@ -166,7 +173,7 @@ async function synchronizeSeasonSteps(year: number, job: JobContext, operations:
         counts.predictions_pending = (counts.predictions_pending ?? 0) + pending;
       } catch (error) {
         if (budgetSpent(job)) { counts.prediction_races_deferred++; throw new BudgetStop(); }
-        errors.push(`round ${round}: ${errorMessage(error)}`);
+        fail(`round ${round}`, error);
       }
     }
   } else if (schedule.length) counts.prediction_races_deferred = schedule.length;

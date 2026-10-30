@@ -3,16 +3,21 @@
  *
  * Schedule: every 10 minutes Friday to Monday (UTC) via
  * .github/workflows/refresh-weekend.yml. Outside a due classification window
- * it makes one cached calendar read and returns `skipped`.
+ * it makes one cached calendar read and returns `skipped`. While Jolpica is
+ * unavailable the last validated calendar (up to 7 days old) is used and the
+ * report is `degraded`; a due classification that cannot be read because
+ * Jolpica is unavailable is deferred with the provider-unavailable contract
+ * (503, lib/cron-outcome.ts). Any other failure stays HTTP 500.
  * Auth: Bearer CRON_SECRET only. Never sends email.
  */
 import { revalidatePath, revalidateTag } from 'next/cache';
-import { invalidateLocalJolpicaSeason, jolpica, mapRace } from '@apex/api-client/jolpica';
+import { invalidateLocalJolpicaSeason, jolpica } from '@apex/api-client/jolpica';
 import { lastGoodRedisConfig } from '@apex/api-client/openf1';
 import { synchronizeActiveSeasons } from '../../../../../workers/src/lib/season-sync-plan';
 import { jobReadOptions } from '../../../../../workers/src/lib/current-season-sync';
 import { PARTIAL_ON_BUDGET_HEADER, runLeasedCron } from '@/lib/leased-cron';
 import { buildReport, logReport } from '@/lib/cron-auth';
+import { calendarReport, providerUnavailableResponse, readCronCalendar, unavailableProvider, type CronCalendar } from '@/lib/cron-outcome';
 import { weekendWatchTargets } from '@/lib/data-freshness';
 import { pathsFor, redisFingerprintStore, runWeekendWatch, type WatchRace } from '@/lib/weekend-watch';
 
@@ -25,16 +30,20 @@ export async function GET(request: Request) {
   return runLeasedCron(request, 'weekend-watch', async (job) => {
     const start = Date.now();
     const now = Date.now();
-    let races: WatchRace[];
+    let calendar: CronCalendar;
     try {
-      races = (await jolpica.getSchedule('current', { strict: true, revalidate: 900, signal: job.signal, timeoutMs: 8_000 })).map(mapRace);
-    } catch {
-      const report = buildReport(start, { ok: false, route: 'weekend-watch', error: 'calendar: Jolpica F1 could not be read; the next run retries.' });
+      calendar = await readCronCalendar({ revalidate: 900, signal: job.signal, timeoutMs: 8_000 });
+    } catch (error) {
+      const provider = unavailableProvider([error]);
+      if (provider) return providerUnavailableResponse(start, { route: 'weekend-watch', provider, error: 'calendar: Jolpica F1 is unavailable and no validated calendar copy exists; the next run retries.' });
+      const report = buildReport(start, { ok: false, route: 'weekend-watch', error: 'calendar: Jolpica F1 could not be read or was invalid; the next run retries.' });
       logReport(report);
       return Response.json(report, { status: 500, headers: { 'cache-control': 'no-store' } });
     }
+    const races: WatchRace[] = calendar.races;
+    const { degraded: staleCalendar, calendar: calendarSource } = calendarReport(calendar);
     if (!weekendWatchTargets(races, now).length) {
-      const report = buildReport(start, { ok: true, route: 'weekend-watch', skipped: 'No qualifying, sprint or race classification is due; nothing to check.' });
+      const report = { ...buildReport(start, { ok: true, route: 'weekend-watch', skipped: 'No qualifying, sprint or race classification is due; nothing to check.', results: { calendar: calendarSource } }), ...(staleCalendar ? { degraded: true } : {}) };
       logReport(report);
       return Response.json(report, { headers: { 'cache-control': 'no-store' } });
     }
@@ -71,8 +80,16 @@ export async function GET(request: Request) {
       } : {}),
     });
     const ok = result.errors.length === 0;
+    // Every failure was Jolpica being unavailable: the due classifications are deferred, not failed.
+    if (!ok && result.unavailable === result.errors.length)
+      return providerUnavailableResponse(start, {
+        route: 'weekend-watch', provider: 'jolpica',
+        error: 'Due classifications could not be read while Jolpica F1 is unavailable; the next run retries.',
+        results: { ...result, calendar: calendarSource },
+      });
     const report = {
-      ...buildReport(start, { ok, route: 'weekend-watch', results: { ...result } }),
+      ...buildReport(start, { ok, route: 'weekend-watch', results: { ...result, calendar: calendarSource } }),
+      ...(staleCalendar ? { degraded: true } : {}),
       continuation: ok && result.deferred > 0,
     };
     logReport(report);

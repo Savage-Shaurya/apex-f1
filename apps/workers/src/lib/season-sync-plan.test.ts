@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { FetchOpts, JolpicaRace } from '@apex/api-client/jolpica';
+import { ProviderError } from '@apex/api-client/jolpica';
 import { currentSeasonOperations } from './current-season-sync';
 import type { JobContext } from './job-control';
 import { planSeasonSync, synchronizeActiveSeasons } from './season-sync-plan';
@@ -115,6 +116,29 @@ test('active-season sync runs each planned season with hooks, sums counts and ta
   assert.equal(report.counts.schedule_rounds, season2026.length + season2027.length);
   assert.equal(report.bySeason['2026']?.schedule_rounds, 3);
   assert.equal(report.ok, true);
+});
+
+// Cron resilience (2026-10-31): the season catch-up tells a Jolpica outage apart from our own failures.
+test('a season sync that failed only because Jolpica was unavailable says so; any other failure does not', async () => {
+  const outage = (async () => { throw new ProviderError('jolpica', 'timeout'); }) as typeof currentSeasonOperations.schedule;
+  let report = await synchronizeActiveSeasons(fakeJob(), { now: Date.parse('2027-01-15T03:00:00Z'), schedule: outage, operations: { ...currentSeasonOperations, schedule: outage } });
+  assert.equal(report.ok, false); assert.equal(report.providerUnavailable, true);
+  const bug = (async () => { throw new TypeError('bug'); }) as typeof currentSeasonOperations.schedule;
+  report = await synchronizeActiveSeasons(fakeJob(), { now: Date.parse('2027-01-15T03:00:00Z'), schedule: bug, operations: { ...currentSeasonOperations, schedule: bug } });
+  assert.equal(report.ok, false); assert.equal(report.providerUnavailable, false);
+  const base: typeof currentSeasonOperations = {
+    ...currentSeasonOperations,
+    schedule: schedule({ current: season2027, 2027: season2027 }),
+    async begin(input) { return { ...input, generation: '1', observationId: '00000000-0000-0000-0000-000000000001' }; },
+    async drivers() { throw new ProviderError('jolpica', 'http', 503); },
+    async teams() { throw new ProviderError('jolpica', 'http', 400, undefined, 'edge'); },
+    async calendar(_year, races) { return { racesPersisted: races.length, sessionsScheduled: 0, withdrawnRaces: 0, withdrawnSessions: 0 }; },
+    async races() { return []; }, async classified() { return []; },
+  };
+  report = await synchronizeActiveSeasons(fakeJob(), { now: Date.parse('2027-03-20T03:00:00Z'), operations: base, maximumRounds: 0 });
+  assert.equal(report.ok, false); assert.equal(report.errors.length, 2); assert.equal(report.providerUnavailable, true);
+  report = await synchronizeActiveSeasons(fakeJob(), { now: Date.parse('2027-03-20T03:00:00Z'), operations: { ...base, async calendar() { throw new Error('database write failed'); } }, maximumRounds: 0 });
+  assert.equal(report.ok, false); assert.equal(report.providerUnavailable, false, 'a persistence failure is ours, not the provider\'s');
 });
 
 function fakeJob(): JobContext {

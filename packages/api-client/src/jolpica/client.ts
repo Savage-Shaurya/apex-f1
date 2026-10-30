@@ -6,7 +6,7 @@ import type {
   JolpicaLapEntry, JolpicaRace,
 } from './types';
 import { ProviderError, failOr, isRecord, requestJson, untrackedFetch } from '../transport';
-import { jolpicaRequestControl } from './request-control';
+import { jolpicaRequestControl, type JolpicaStaleFallback } from './request-control';
 import { resolveProviderBase } from '../provider-base';
 import { APEX_USER_AGENT } from '../user-agent';
 import { BUILD_QUEUE_ALLOWANCE_MS, BUILD_READ_ATTEMPTS, buildRetryDelayMs, isBuildPhase, providerReadBudget } from '../build-phase';
@@ -34,6 +34,8 @@ export interface FetchOpts {
   deadlineMs?: number;
   limit?: number;
   offset?: number;
+  /** Cron calendar reads only: accept an older validated copy while Jolpica is unavailable (request-control.ts). */
+  staleFallback?: JolpicaStaleFallback;
 }
 async function safe<T>(opts: FetchOpts, fallback: T, operation: () => Promise<T>): Promise<T> {
   try { return await operation(); }

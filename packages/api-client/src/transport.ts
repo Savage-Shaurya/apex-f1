@@ -6,9 +6,72 @@ export class ProviderError extends Error {
     readonly status?: number,
     /** Server-requested wait (HTTP Retry-After), when the provider sent one. */
     readonly retryAfterMs?: number,
+    /**
+     * Who answered a failed HTTP request: 'provider' when the body is the
+     * provider's own JSON error (our request was rejected), 'edge' when it is
+     * a CDN/proxy page or empty (the provider never answered it).
+     */
+    readonly origin?: 'provider' | 'edge',
   ) {
     super(`${provider}: ${code}${status === undefined ? '' : ` (HTTP ${status})`}`);
     this.name = 'ProviderError';
+  }
+}
+
+/**
+ * Why a provider read failed (cron resilience, 2026-10-31):
+ *  - provider-unavailable: the provider or its edge is down, overloaded or
+ *    rate-limiting (timeouts, dropped connections, 408/425/429, 5xx, and a 4xx
+ *    whose body is not the provider's own JSON answer). Temporary; retry later.
+ *  - request-rejected: the provider itself refused our request (its JSON 4xx).
+ *  - configuration: credentials or settings (401/403 from the provider, bad config).
+ *  - invalid-data: the provider answered with data that fails validation.
+ *  - internal: anything that is not a provider failure (our own bug).
+ */
+export type ProviderFailureClass = 'provider-unavailable' | 'request-rejected' | 'configuration' | 'invalid-data' | 'internal';
+
+export function classifyProviderFailure(error: unknown): ProviderFailureClass {
+  if (!(error instanceof ProviderError)) return 'internal';
+  switch (error.code) {
+    case 'timeout': case 'network': case 'rate-limit': return 'provider-unavailable';
+    case 'configuration': return 'configuration';
+    case 'invalid-input': return 'request-rejected';
+    case 'invalid-response': case 'incomplete': return 'invalid-data';
+    case 'http': {
+      const status = error.status ?? 0;
+      if (status === 408 || status === 425 || status === 429 || status >= 500) return 'provider-unavailable';
+      if (error.origin === 'edge') return 'provider-unavailable';
+      return status === 401 || status === 403 ? 'configuration' : 'request-rejected';
+    }
+    default: return 'internal';
+  }
+}
+
+/** True only for a temporary upstream outage, never for our bug, auth/config or invalid data. */
+export function isProviderUnavailable(error: unknown): boolean {
+  return classifyProviderFailure(error) === 'provider-unavailable';
+}
+
+/**
+ * Peek (bounded: 4 KB, 1 s) at a failed response's body: the provider's own
+ * JSON object means it rejected our request; HTML, text, an empty body or a
+ * stalled read means a CDN/edge answered instead. The body is never kept.
+ */
+async function failureOrigin(response: Response, signal: AbortSignal): Promise<'provider' | 'edge'> {
+  if (!/^application\/(?:[a-z0-9.+-]+\+)?json\b/i.test(response.headers.get('content-type') ?? '')) {
+    void response.body?.cancel().catch(() => undefined);
+    return 'edge';
+  }
+  const timer = new AbortController();
+  const stop = setTimeout(() => timer.abort(), 1_000);
+  try {
+    const text = await readLimitedText(response, 4_096, AbortSignal.any([signal, timer.signal]));
+    const parsed = JSON.parse(text) as unknown;
+    return isRecord(parsed) && Object.keys(parsed).length > 0 ? 'provider' : 'edge';
+  } catch {
+    return 'edge';
+  } finally {
+    clearTimeout(stop);
   }
 }
 
@@ -140,8 +203,8 @@ export async function requestJson<T = unknown>(
   return withProviderDeadline(provider, async (signal) => {
     const response = await (options.fetchImpl ?? fetch)(url.toString(), { redirect: 'error', ...init, signal });
     if (!response.ok) {
-      void response.body?.cancel().catch(() => undefined);
-      throw new ProviderError(provider, 'http', response.status, retryAfterMs(response.headers.get('retry-after')));
+      const origin = await failureOrigin(response, signal);
+      throw new ProviderError(provider, 'http', response.status, retryAfterMs(response.headers.get('retry-after')), origin);
     }
     const text = await readLimitedText(response, options.maxBytes, signal);
     try { return JSON.parse(text) as T; }

@@ -68,6 +68,21 @@ export interface JolpicaReadOptions extends ProviderRequestOptions {
   retryAttempt?: boolean;
   /** Endpoint class for 429 pauses; derived from the key when omitted. */
   rateScope?: string;
+  /** Opt-in older fallback while Jolpica is unavailable (see JolpicaStaleFallback). */
+  staleFallback?: JolpicaStaleFallback;
+}
+
+/**
+ * A caller that only needs slowly-changing data (the season calendar for a
+ * cron job) may accept a validated copy older than the normal stale-if-error
+ * window while Jolpica is unavailable, and is told when one was served so it
+ * can report it. Pages never pass this.
+ */
+export interface JolpicaStaleFallback {
+  /** Oldest acceptable copy, measured from when it was validated. */
+  maxAgeMs: number;
+  /** Called with the copy's validation time whenever a fallback copy answers the read. */
+  onServed?(storedAt: number): void;
 }
 
 /** Validated process cache plus mandatory account-wide admission when configured. */
@@ -290,11 +305,13 @@ export class JolpicaRequestControl {
     this.failures.delete(key);
   }
 
-  /** A validated copy that is past its TTL but inside the stale-if-error window. */
-  private stale<T>(key: string): T | undefined {
+  /** A validated copy that is past its TTL but inside the stale-if-error window (or the caller's longer one). */
+  private stale<T>(key: string, maxAgeMs?: number): { value: T; storedAt: number } | undefined {
     const cached = this.cache.get(key);
-    if (!cached || cached.staleUntil <= this.now()) return undefined;
-    return structuredClone(cached.value) as T;
+    if (!cached) return undefined;
+    const usable = cached.staleUntil > this.now() || (maxAgeMs !== undefined && this.now() - cached.storedAt <= maxAgeMs);
+    if (!usable) return undefined;
+    return { value: structuredClone(cached.value) as T, storedAt: cached.storedAt };
   }
 
   private noteFailure(key: string, error: unknown): void {
@@ -310,21 +327,25 @@ export class JolpicaRequestControl {
   }
 
   /** The cross-instance last-good copy, inside the window this key may be served stale (F-02). */
-  private async lastGood<T>(key: string): Promise<T | undefined> {
+  private async lastGood<T>(key: string, maxAgeMs?: number): Promise<{ value: T; storedAt: number } | undefined> {
     const store = this.config.lastGood;
     if (!store) return undefined;
     const entry = await store.read(key).catch(() => null);
     if (!entry) return undefined;
     const window = jolpicaKeyIsImmutable(key, this.now())
       ? Number.POSITIVE_INFINITY
-      : (this.config.staleIfErrorMs ?? JOLPICA_STALE_IF_ERROR_MS);
+      : Math.max(this.config.staleIfErrorMs ?? JOLPICA_STALE_IF_ERROR_MS, maxAgeMs ?? 0);
     if (this.now() - entry.storedAt > window) return undefined;
-    return structuredClone(entry.value) as T;
+    return { value: structuredClone(entry.value) as T, storedAt: entry.storedAt };
   }
 
-  /** Process copy first, then the shared last-good copy. */
-  private async fallback<T>(key: string): Promise<T | undefined> {
-    return this.stale<T>(key) ?? (await this.lastGood<T>(key));
+  /** Process copy first, then the shared last-good copy; tells an opted-in caller it was served. */
+  private async fallback<T>(key: string, stale?: JolpicaStaleFallback): Promise<T | undefined> {
+    const maxAgeMs = stale && Number.isFinite(stale.maxAgeMs) && stale.maxAgeMs > 0 ? stale.maxAgeMs : undefined;
+    const copy = this.stale<T>(key, maxAgeMs) ?? (await this.lastGood<T>(key, maxAgeMs));
+    if (!copy) return undefined;
+    try { stale?.onServed?.(copy.storedAt); } catch { /* reporting only */ }
+    return copy.value;
   }
 
   async readThrough<T>(
@@ -355,7 +376,7 @@ export class JolpicaRequestControl {
       const failure = this.failures.get(key);
       const failing = Boolean(failure && failure.until > this.now());
       if (failing || this.cooldownUntil(scope) > this.now()) {
-        const copy = await this.fallback<T>(key);
+        const copy = await this.fallback<T>(key, opts.staleFallback);
         if (copy !== undefined) return copy;
         if (failing) throw failure!.error;
       }
@@ -439,7 +460,7 @@ export class JolpicaRequestControl {
       // unavailable page when Jolpica is down or rate-limited. Strict fresh
       // observations (ingestion, revalidate:0) never accept an old copy.
       if (!unshared && isProviderFailure(error)) {
-        const copy = await this.fallback<T>(key);
+        const copy = await this.fallback<T>(key, opts.staleFallback);
         if (copy !== undefined) return copy;
       }
       throw error;

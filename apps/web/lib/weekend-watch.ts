@@ -1,6 +1,6 @@
 import { scopedRedisKey } from '../../../packages/api-client/src/redis-scope';
 import { createHash } from 'node:crypto';
-import { untrackedFetch } from '../../../packages/api-client/src/transport';
+import { isProviderUnavailable, untrackedFetch } from '../../../packages/api-client/src/transport';
 import { weekendWatchTargets, type RaceTimes, type WatchTarget } from './data-freshness';
 
 /**
@@ -91,6 +91,8 @@ export interface WeekendWatchReport {
   unchanged: string[];
   ingested: string[];
   errors: string[];
+  /** How many of `errors` were only the provider being unavailable (timeouts, 429, 5xx, edge errors). */
+  unavailable: number;
   deferred: number;
 }
 
@@ -98,7 +100,7 @@ const label = (t: WatchTarget) => `${t.season}/${t.round}/${t.kind}`;
 
 export async function runWeekendWatch(deps: WeekendWatchDependencies): Promise<WeekendWatchReport> {
   const targets = weekendWatchTargets(deps.races, deps.now);
-  const report: WeekendWatchReport = { due: targets.length, checked: 0, pending: [], changed: [], unchanged: [], ingested: [], errors: [], deferred: 0 };
+  const report: WeekendWatchReport = { due: targets.length, checked: 0, pending: [], changed: [], unchanged: [], ingested: [], errors: [], unavailable: 0, deferred: 0 };
   for (const [index, target] of targets.entries()) {
     if (deps.hasTime && !deps.hasTime()) { report.deferred = targets.length - index; break; }
     const race = deps.races.find((r) => r.season === target.season && r.round === target.round)!;
@@ -108,6 +110,7 @@ export async function runWeekendWatch(deps: WeekendWatchDependencies): Promise<W
       // Only the provider's short error code is reported (never a message, URL or payload).
       const code = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' && /^[a-z-]{1,40}$/.test(error.code) ? error.code : 'error';
       report.errors.push(`${label(target)}: classification could not be read (${code}); the next run retries.`);
+      if (isProviderUnavailable(error)) report.unavailable++;
       continue;
     }
     report.checked++;

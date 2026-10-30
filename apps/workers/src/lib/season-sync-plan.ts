@@ -9,6 +9,7 @@ import {
   type UiRace,
 } from '@apex/api-client/jolpica';
 import type { JobContext } from './job-control';
+import { isProviderUnavailable } from '@apex/api-client/jolpica';
 import { budgetSpent, currentSeasonOperations, jobReadOptions, synchronizeCurrentSeason } from './current-season-sync';
 
 /**
@@ -98,6 +99,8 @@ export interface ActiveSeasonsReport {
   errors: string[];
   /** Optional planning reads that failed; reported, but they do not fail the job. */
   warnings: string[];
+  /** Every error was caused only by the provider being unavailable (timeouts, 429, 5xx, edge errors): retry later. */
+  providerUnavailable: boolean;
 }
 
 /**
@@ -118,10 +121,10 @@ export async function synchronizeActiveSeasons(job: JobContext, input: {
   try {
     plan = await planSeasonSync(input.now ?? Date.now(), () => jobReadOptions(job), input.schedule ?? operations.schedule);
   } catch (error) {
-    if (budgetSpent(job)) return { ok: true, complete: false, seasons: [], counts: { budget_exhausted: 1 }, bySeason: {}, errors: [], warnings: ['calendar: the time budget ran out before the season plan was read; the next run continues.'] };
+    if (budgetSpent(job)) return { ok: true, complete: false, seasons: [], counts: { budget_exhausted: 1 }, bySeason: {}, errors: [], warnings: ['calendar: the time budget ran out before the season plan was read; the next run continues.'], providerUnavailable: false };
     job.assertActive();
     const message = error instanceof Error && /incomplete|calendar/i.test(error.message) ? error.message.slice(0, 200) : 'calendar: season plan could not be read; previous verified data was retained.';
-    return { ok: false, complete: false, seasons: [], counts: {}, bySeason: {}, errors: [message], warnings: [] };
+    return { ok: false, complete: false, seasons: [], counts: {}, bySeason: {}, errors: [message], warnings: [], providerUnavailable: isProviderUnavailable(error) };
   }
   const counts: Record<string, number> = {};
   const bySeason: Record<string, Record<string, number>> = {};
@@ -149,5 +152,6 @@ export async function synchronizeActiveSeasons(job: JobContext, input: {
       break;
     }
   }
-  return { ok: errors.length === 0, complete: complete && errors.length === 0, seasons: plan.seasons, counts, bySeason, errors, warnings: plan.warnings };
+  const providerUnavailable = errors.length > 0 && (counts.provider_unavailable_errors ?? 0) === errors.length;
+  return { ok: errors.length === 0, complete: complete && errors.length === 0, seasons: plan.seasons, counts, bySeason, errors, warnings: plan.warnings, providerUnavailable };
 }
