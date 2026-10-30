@@ -6,17 +6,17 @@ const expectedVercel = new Map([['jolpica-nightly','0 3 * * *'],['youtube-sync',
 // [route, workflow]: jolpica-nightly also has GitHub catch-up runs that continue deferred rounds
 // (--until-complete, hence a longer job timeout); weekend-watch makes race-weekend results appear on
 // their own; youtube-sync adds two-hourly video refreshes to the daily hosting run. Weather, weekend
-// and season jobs retry a provider outage in-run (scripts/invoke-cron.mjs, up to 8 minutes), hence
-// their 10/10/15-minute timeouts (cron resilience, 2026-10-31).
+// news, video and season jobs retry a provider outage in-run (scripts/invoke-cron.mjs, up to 8 minutes), hence
+// their 10-minute (season: 15) timeouts (cron resilience, 2026-10-31).
 const expectedGithub = [
-  ['rss-sync',{file:'refresh-news.yml',schedules:['2,32 * * * *'],timeout:3}],
+  ['rss-sync',{file:'refresh-news.yml',schedules:['2,32 * * * *'],timeout:10}],
   ['weather-sync',{file:'refresh-weather.yml',schedules:['17 * * * *'],timeout:10}],
   ['jolpica-nightly',{file:'refresh-season.yml',schedules:['35 3-5 * * *'],timeout:15}],
   ['weekend-watch',{file:'refresh-weekend.yml',schedules:['4-54/10 * * * 5,6,0','4-54/10 0-6 * * 1'],timeout:10}],
-  ['youtube-sync',{file:'refresh-videos.yml',schedules:['41 */2 * * *'],timeout:3}],
+  ['youtube-sync',{file:'refresh-videos.yml',schedules:['41 */2 * * *'],timeout:10}],
 ];
 // Reviewed full workflow bytes: extra schedules, steps or permissions require review.
-const workflowHashes=new Map([['refresh-news.yml','6dfdfc8537c500c24185f9f6f0edd8086ad6967ef537e79d2b28ecec3853fb92'],['refresh-weather.yml','843f1c96af2f0b4b9fc748de8ab9647dc4a1d1a47f4ae14c2f6867d90a0f3cda'],['refresh-season.yml','a61e6d85d5e37628c78c827a82ba3e753e3a0e09bdd530edb08e24ef50f7744a'],['refresh-weekend.yml','c35824921866cd633ee7e537c465b6d649357774455976bab61a912dcaf0c307'],['refresh-videos.yml','5e6cc289acd69e88f95b41b848fff4569d4c929b4251f639e0c520e7c907dbc9']]);
+const workflowHashes=new Map([['refresh-news.yml','6a934444a2da6da3ee117c9eb99e88774b1eee36a5fec7035cbce314ce5002b9'],['refresh-weather.yml','843f1c96af2f0b4b9fc748de8ab9647dc4a1d1a47f4ae14c2f6867d90a0f3cda'],['refresh-season.yml','a61e6d85d5e37628c78c827a82ba3e753e3a0e09bdd530edb08e24ef50f7744a'],['refresh-weekend.yml','c35824921866cd633ee7e537c465b6d649357774455976bab61a912dcaf0c307'],['refresh-videos.yml','c4acd495aa6040960a1ccf5393c03a34fa8877ed86045e5a97441f2def1967c9']]);
 export async function inspectSchedulers(root) {
   const issues=[];
   const vercel=JSON.parse(await readFile(path.join(root,'apps/web/vercel.json'),'utf8'));

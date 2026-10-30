@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthorizedCronRequest, buildReport, logReport } from "./cron-auth";
 import { safeErrorMessage } from "./api-input";
 import type { syncRecentYouTubeUploads } from "./youtube-sync";
+import { providerUnavailableResponse } from "./cron-outcome";
 
 /** Injection keeps scheduler/cache failure behavior testable without Next or DB writes. */
 export async function handleYouTubeSync(
@@ -30,6 +31,13 @@ export async function handleYouTubeSync(
   try {
     operations.refresh();
     const result = await operations.sync();
+    if (!result.ok && result.providerUnavailable)
+      return providerUnavailableResponse(start, {
+        route: "youtube-sync",
+        provider: "youtube",
+        error: "YouTube is unavailable (timeouts, quota or server errors); stored videos were kept. The next run retries.",
+        extra: { channels: result.channels, totals: result.totals },
+      });
     const report = {
       ...buildReport(start, {
         ok: result.ok,

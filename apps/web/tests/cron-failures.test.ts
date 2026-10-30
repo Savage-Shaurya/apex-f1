@@ -110,7 +110,8 @@ test("YouTube cron marks a partial channel failure as failed", async () => {
       if (
         url.searchParams.get("playlistId") === `UU${failedChannel.slice(2)}`
       ) {
-        return new Response("{}", { status: 403 });
+        // YouTube's own JSON refusal (not a quota reply): a hard failure, never an outage.
+        return Response.json({ error: { code: 403, errors: [{ reason: "forbidden" }] } }, { status: 403 });
       }
       return Response.json({ items: [] });
     }

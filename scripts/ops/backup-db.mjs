@@ -205,8 +205,26 @@ export function redactSecrets(text, secrets = []) {
 
 // ---------- side-effecting helpers ----------
 
-class BackupError extends Error {}
-const fail = message => { throw new BackupError(message); };
+/** `outage`: Supabase (database or Storage) was unreachable or overloaded, not misconfigured (exit 75). */
+class BackupError extends Error {
+  constructor(message, { outage = false } = {}) { super(message); this.outage = outage; }
+}
+const fail = (message, outage = false) => { throw new BackupError(message, { outage }); };
+/** Exit code for "upstream unavailable, retry later" (EX_TEMPFAIL), read by scripts/ops/scheduled-job.mjs. */
+export const EX_TEMPFAIL = 75;
+
+/**
+ * pg_dump/libpq messages for an unreachable, overloaded or restarting server.
+ * Authentication, TLS/certificate, permission and SQL errors are ours (never an outage).
+ */
+const PG_OUTAGE = /could not connect to server|could not translate host name|connection refused|timeout expired|connection timed out|server closed the connection unexpectedly|the database system is (?:starting up|shutting down|in recovery mode)|too many connections|remaining connection slots are reserved|no route to host|network is unreachable|connection to server .* failed: (?:Connection refused|timeout|Operation timed out)/i;
+const PG_OURS = /password authentication failed|no pg_hba\.conf entry|SSL|certificate|permission denied|does not exist|role .* is not permitted/i;
+export function isDatabaseOutageText(stderr) {
+  const text = String(stderr ?? '');
+  return PG_OUTAGE.test(text) && !PG_OURS.test(text);
+}
+/** Storage answered, but only an overloaded or failing service answers like this. */
+export const isStorageOutageStatus = (status) => status === 408 || status === 429 || status >= 500;
 
 function run(tool, args, env, { timeoutMs = 15 * 60 * 1000 } = {}) {
   return new Promise((resolve, reject) => {
@@ -222,23 +240,30 @@ function run(tool, args, env, { timeoutMs = 15 * 60 * 1000 } = {}) {
 }
 
 async function storage(config, method, route, { body, headers = {}, auth = true } = {}) {
-  const response = await fetch(`${config.supabaseUrl}/storage/v1${route}`, {
-    method,
-    headers: { ...(auth ? { apikey: config.serviceKey, authorization: `Bearer ${config.serviceKey}` } : {}), ...headers },
-    body,
-  });
-  return response;
+  try {
+    return await fetch(`${config.supabaseUrl}/storage/v1${route}`, {
+      method,
+      headers: { ...(auth ? { apikey: config.serviceKey, authorization: `Bearer ${config.serviceKey}` } : {}), ...headers },
+      body,
+      // A hung Storage API must not hold the job until its 20-minute timeout.
+      signal: AbortSignal.timeout(5 * 60_000),
+    });
+  } catch (error) {
+    const code = error?.cause?.code ?? error?.name ?? 'error';
+    fail(`Storage ${method} request could not reach Supabase (${String(code).replace(/[^A-Za-z0-9_]/g, '').slice(0, 40)}).`, true);
+  }
 }
 
 async function storageJson(config, method, route, payload, what) {
   const response = await storage(config, method, route, { body: payload === undefined ? undefined : JSON.stringify(payload), headers: payload === undefined ? {} : { 'content-type': 'application/json' } });
   const text = await response.text();
-  if (!response.ok) fail(`Storage ${what} failed: HTTP ${response.status} ${redactSecrets(text, [config.serviceKey]).slice(0, 200)}`);
+  if (!response.ok) fail(`Storage ${what} failed: HTTP ${response.status} ${redactSecrets(text, [config.serviceKey]).slice(0, 200)}`, isStorageOutageStatus(response.status));
   return text ? JSON.parse(text) : null;
 }
 
 async function ensurePrivateBucket(config) {
   const response = await storage(config, 'GET', `/bucket/${config.bucket}`);
+  if (isStorageOutageStatus(response.status)) { await response.text(); fail(`Storage bucket check failed: HTTP ${response.status}`, true); }
   if (response.ok) {
     const bucket = await response.json();
     if (bucket.public !== false) fail(`Bucket ${config.bucket} is PUBLIC. Make it private in Supabase Storage before storing backups.`);
@@ -254,12 +279,12 @@ async function ensurePrivateBucket(config) {
 async function upload(config, key, body, contentType) {
   const response = await storage(config, 'POST', `/object/${config.bucket}/${key}`, { body, headers: { 'content-type': contentType, 'x-upsert': 'true', 'cache-control': 'no-store' } });
   const text = await response.text();
-  if (!response.ok) fail(`Upload of ${key} failed: HTTP ${response.status} ${redactSecrets(text, [config.serviceKey]).slice(0, 200)}`);
+  if (!response.ok) fail(`Upload of ${key} failed: HTTP ${response.status} ${redactSecrets(text, [config.serviceKey]).slice(0, 200)}`, isStorageOutageStatus(response.status));
 }
 
 async function download(config, key) {
   const response = await storage(config, 'GET', `/object/authenticated/${config.bucket}/${key}`);
-  if (!response.ok) { await response.text(); fail(`Download of ${key} for verification failed: HTTP ${response.status}`); }
+  if (!response.ok) { await response.text(); fail(`Download of ${key} for verification failed: HTTP ${response.status}`, isStorageOutageStatus(response.status)); }
   return Buffer.from(await response.arrayBuffer());
 }
 
@@ -327,6 +352,8 @@ function readConfig() {
   };
 }
 
+export { BackupError };
+
 export async function runBackup({ now = new Date(), log = message => console.log(message) } = {}) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const config = readConfig();
@@ -346,7 +373,7 @@ export async function runBackup({ now = new Date(), log = message => console.log
 
     const dumpFile = path.join(tmp, 'apex.dump');
     const dump = await run(tool('pg_dump'), ['--format=custom', '--compress=9', '--schema=public', '--schema=drizzle', '--no-password', '--lock-wait-timeout=60000', `--file=${dumpFile}`], env);
-    if (dump.code !== 0) fail(`pg_dump failed (exit ${dump.code}): ${redactSecrets(dump.stderr.trim().split('\n').slice(-4).join(' | '), secrets).slice(0, 600)}`);
+    if (dump.code !== 0) fail(`pg_dump failed (exit ${dump.code}): ${redactSecrets(dump.stderr.trim().split('\n').slice(-4).join(' | '), secrets).slice(0, 600)}`, isDatabaseOutageText(dump.stderr));
     const body = await readFile(dumpFile);
     if (body.length < 1024) fail(`pg_dump produced only ${body.length} bytes.`);
     log(`2/7 pg_dump ok over verify-full TLS: ${body.length} bytes`);
@@ -397,8 +424,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       const known = error instanceof BackupError || /must|required|valid|positive|Port 6543|CA file/.test(error.message);
       const secrets = [process.env.SUPABASE_SERVICE_ROLE_KEY, process.env.SUPABASE_BACKUP_DB_URL];
       try { secrets.push(decodeURIComponent(new URL(process.env.SUPABASE_BACKUP_DB_URL ?? '').password)); } catch { /* no URL */ }
-      console.error(`Backup FAILED: ${known ? redactSecrets(error.message, secrets) : 'unexpected ' + (error.name || 'error') + ': ' + redactSecrets(error.message, secrets).slice(0, 300)}`);
-      process.exitCode = 1;
+      const outage = error instanceof BackupError && error.outage;
+      console.error(`Backup ${outage ? 'DEFERRED (Supabase unavailable)' : 'FAILED'}: ${known ? redactSecrets(error.message, secrets) : 'unexpected ' + (error.name || 'error') + ': ' + redactSecrets(error.message, secrets).slice(0, 300)}`);
+      process.exitCode = outage ? EX_TEMPFAIL : 1;
     },
   );
 }

@@ -78,7 +78,7 @@ function variablesReadBySource() {
 }
 /** Set by the platform, Node or the test runner, never by an operator. */
 const PLATFORM = new Set(['NODE_ENV', 'NODE_OPTIONS', 'NEXT_PHASE', 'NEXT_RUNTIME', 'VERCEL', 'VERCEL_ENV', 'VERCEL_URL', 'VERCEL_REGION',
-  'VERCEL_GIT_COMMIT_SHA', 'VERCEL_PROJECT_PRODUCTION_URL', 'GITHUB_TOKEN', 'GITHUB_OUTPUT', 'GITHUB_STEP_SUMMARY', 'RUNNER_TEMP', 'CI', 'HOME', 'PATH']);
+  'VERCEL_GIT_COMMIT_SHA', 'VERCEL_PROJECT_PRODUCTION_URL', 'GITHUB_TOKEN', 'GITHUB_OUTPUT', 'GITHUB_STEP_SUMMARY', 'GITHUB_REPOSITORY', 'GITHUB_WORKFLOW_REF', 'RUNNER_TEMP', 'CI', 'HOME', 'PATH']);
 
 test('apps/web/.env.example names every variable the source reads, with an explanation and no values', () => {
   const example = read('apps/web/.env.example');

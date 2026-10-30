@@ -4,6 +4,10 @@ import { spawn } from 'node:child_process';
 import { resolve,dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { evaluateDependencyAudits } from './dependency-audit-policy.mjs';
+import { EX_TEMPFAIL, isNpmOutage } from './ops/scheduled-job.mjs';
+
+/** The registry (not our lockfile, policy or code) failed: retried by scripts/ops/scheduled-job.mjs. */
+class RegistryOutage extends Error {}
 
 /** Bound every owned subprocess, including its descendants on timeout. */
 export function runAuditCommand(args,{root,timeoutMs=60_000,maxStdout=8*1024*1024,maxStderr=1024*1024}={}) {
@@ -53,6 +57,8 @@ export async function runDependencyAudit({root,cli,command=runAuditCommand,now=(
       stdoutBytes:Buffer.byteLength(result.stdout??''),stderrBytes:Buffer.byteLength(result.stderr??'')};
     status.commands.push(record);save('run-status',status);
     if(phase==='full'||phase==='production')writeFileSync(resolve(directory,phase+'.stdout.log'),result.stdout??'');
+    const registryPhase=phase==='full'||phase==='production';
+    if(registryPhase&&(record.timedOut||(!allowedCodes.includes(result.code)&&isNpmOutage(`${result.stdout??''}\n${result.stderr??''}`))))throw new RegistryOutage('Registry '+phase+' audit could not reach the npm registry; the next run retries.');
     if(!allowedCodes.includes(result.code)||record.timedOut||record.outputLimitExceeded||record.spawnError)throw new Error('Dependency '+phase+' command did not complete safely.');
     return result;
   }
@@ -64,7 +70,10 @@ export async function runDependencyAudit({root,cli,command=runAuditCommand,now=(
     for(const [name,args]of [['full',['audit','--json']],['production',['audit','--prod','--json']]]){
       const result=await invoke(name,[cli,...args,'--registry=https://registry.npmjs.org/'],[0,1],60_000);
       // Current bounded stdout is retained even when it is not valid registry JSON.
-      try{reports[name]=JSON.parse(result.stdout);}catch{throw new Error('Registry '+name+' audit returned invalid JSON.');}
+      try{reports[name]=JSON.parse(result.stdout);}catch{
+        if(isNpmOutage(`${result.stdout??''}\n${result.stderr??''}`))throw new RegistryOutage('Registry '+name+' audit could not reach the npm registry; the next run retries.');
+        throw new Error('Registry '+name+' audit returned invalid JSON.');
+      }
       save(name,reports[name]);
       status.reports[name]={sha256:createHash('sha256').update(readFileSync(resolve(directory,name+'.json'))).digest('hex')};
       save('run-status',status);
@@ -77,8 +86,9 @@ export async function runDependencyAudit({root,cli,command=runAuditCommand,now=(
     policy=evaluateDependencyAudits(reports.full,reports.production,{now:now(),patchVerified,regressionPassed:regression.code===0});
     status.ready=policy.ready;status.status=policy.ready?'passed':'failed';
   }catch(error){
-    policy={ready:false,rejected:[error instanceof Error?error.message:'Dependency audit failed.'],mitigated:[]};
+    policy={ready:false,rejected:[error instanceof Error?error.message:'Dependency audit failed.'],mitigated:[],...(error instanceof RegistryOutage?{registryUnavailable:true}:{})};
     status.status='failed';status.ready=false;
+    if(error instanceof RegistryOutage)status.registryUnavailable=true;
   }
   status.finishedAt=now();saveVerdict();save('run-status',status);
   return {...policy,runId:status.runId,startedAt:status.startedAt,finishedAt:status.finishedAt};
@@ -89,5 +99,5 @@ if(process.argv[1]&&resolve(process.argv[1])===script){
   const root=resolve(dirname(script),'..');
   const cli=process.argv[2]==='--pnpm-cli'&&process.argv.length===4?process.argv[3]:process.argv.length===2?process.env.npm_execpath:null;
   const result=await runDependencyAudit({root,cli});console.log(JSON.stringify(result,null,2));
-  if(!result.ready)process.exitCode=1;
+  if(!result.ready)process.exitCode=result.registryUnavailable?EX_TEMPFAIL:1;
 }

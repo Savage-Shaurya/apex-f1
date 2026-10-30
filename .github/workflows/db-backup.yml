@@ -9,6 +9,12 @@ name: Database backup
 #   SUPABASE_SERVICE_ROLE_KEY  service key (Storage API only)
 #   SUPABASE_DB_CA_CERT        optional PEM; when unset the Supabase root CA bundled in packages/db is used
 # Restore and verification steps: scripts/ops/restore-db.md
+#
+# Supabase outages (cron resilience, 2026-10-31; DEPLOY.md "Cron outcomes"): backup-db.mjs exits 75
+# when the database or Storage is unreachable/overloaded; scripts/ops/scheduled-job.mjs retries it
+# (30 s, 90 s) and, if Supabase is still down, ends green with a ::warning:: while the last verified
+# backup (the "Record verified success" step of an earlier run) is under 48 h old, red otherwise.
+# Auth, configuration, TLS and archive/verification failures stay red at once.
 
 on:
   schedule:
@@ -21,11 +27,12 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read # read earlier runs of this workflow for the last verified backup
 
 jobs:
   backup:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -52,12 +59,14 @@ jobs:
           done
           exit $missing
       - name: Back up database to private Supabase Storage
+        id: backup
         env:
           SUPABASE_BACKUP_DB_URL: ${{ secrets.SUPABASE_BACKUP_DB_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_DB_CA_CERT: ${{ secrets.SUPABASE_DB_CA_CERT }}
           PG_BIN_DIR: /usr/lib/postgresql/17/bin
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set +x
           # Mask the password part of the URL as well (GitHub already masks each whole secret).
@@ -70,4 +79,8 @@ jobs:
             export SUPABASE_DB_CA_PATH="$RUNNER_TEMP/supabase-ca.crt"
           fi
           unset SUPABASE_DB_CA_CERT
-          node scripts/ops/backup-db.mjs
+          node scripts/ops/scheduled-job.mjs --job db-backup --stale-after-hours=48 -- node scripts/ops/backup-db.mjs
+      # Runs only after a complete, verified backup; a deferred (outage) run never records one.
+      - name: Record verified success
+        if: steps.backup.outputs.outcome == 'ok'
+        run: echo "Verified backup recorded for the outage policy."

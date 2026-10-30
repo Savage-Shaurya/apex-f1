@@ -69,6 +69,32 @@ export function unavailableProvider(errors: readonly unknown[]): string | null {
   return typeof provider === 'string' && /^[a-z0-9-]{1,32}$/.test(provider) ? provider : 'provider';
 }
 
+/** Node network failures that mean "the other side is not reachable right now". */
+const NETWORK_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET']);
+/**
+ * PostgreSQL SQLSTATEs for an unreachable or overloaded server: connection
+ * exceptions (08xxx), shutdown/starting up (57P01-57P03), too many
+ * connections / insufficient resources (53xxx). Auth (28xxx), permissions,
+ * missing tables and every other code are configuration or our bug.
+ */
+const DATABASE_OUTAGE_SQLSTATE = /^(?:08\d{3}|57P0[1-3]|53\d{3})$/;
+const DATABASE_OUTAGE_MESSAGE = /connection terminated unexpectedly|timeout exceeded when trying to connect|connection timeout|server closed the connection unexpectedly/i;
+
+/** True when the job database could not be reached (Supabase down, pooler overloaded), never for auth or SQL errors. */
+export function isDatabaseUnavailable(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth++) {
+    const record = current as { code?: unknown; message?: unknown; cause?: unknown; errors?: unknown };
+    if (typeof record.code === 'string') {
+      if (NETWORK_CODES.has(record.code) || DATABASE_OUTAGE_SQLSTATE.test(record.code)) return true;
+      if (/^(?:28|42)/.test(record.code)) return false;
+    }
+    if (typeof record.message === 'string' && DATABASE_OUTAGE_MESSAGE.test(record.message)) return true;
+    current = record.cause ?? (Array.isArray(record.errors) ? record.errors[0] : undefined);
+  }
+  return false;
+}
+
 export type ProviderUnavailableReport = CronReport & {
   retryable: true;
   reason: typeof PROVIDER_UNAVAILABLE;

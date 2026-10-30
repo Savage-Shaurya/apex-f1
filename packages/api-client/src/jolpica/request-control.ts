@@ -149,6 +149,18 @@ export class JolpicaRequestControl {
     return this.starts.filter((time) => time > cutoff).length;
   }
 
+  /**
+   * Forget every local copy, remembered failure, 429 pause and start count, as
+   * after a process restart. For deterministic tests and operator tooling only;
+   * the running site never calls it.
+   */
+  reset(): void {
+    this.invalidate(() => true);
+    this.cooldowns.clear();
+    this.starts = [];
+    this.lastStart = -Infinity;
+  }
+
   /** Expire selected local copies without resetting pacing or in-flight requests. */
   invalidate(matches: (key: string) => boolean): void {
     this.generation++;

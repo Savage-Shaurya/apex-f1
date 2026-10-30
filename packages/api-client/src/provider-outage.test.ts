@@ -70,3 +70,18 @@ test('the shared admission store (Upstash) reports its own failures, never as a 
   assert.equal(isProviderUnavailable(error), false);
   assert.doesNotMatch(error.message, /synthetic-token|max requests/);
 });
+
+test("YouTube's quota reply (403 quotaExceeded / rateLimitExceeded) is a rate limit; its other 403s are configuration", async () => {
+  const youtube = (body: unknown) => failureOf((async () => Response.json(body, { status: 403 })) as typeof fetch);
+  for (const reason of ['quotaExceeded', 'rateLimitExceeded', 'userRateLimitExceeded', 'dailyLimitExceeded']) {
+    const error = await youtube({ error: { code: 403, errors: [{ reason }] } });
+    assert.ok(error instanceof ProviderError);
+    assert.equal(error.code, 'rate-limit', reason);
+    assert.equal(isProviderUnavailable(error), true);
+  }
+  for (const body of [{ error: { code: 403, errors: [{ reason: 'forbidden' }] } }, {}, { error: 'denied' }])
+    assert.equal(classifyProviderFailure(await youtube(body)), 'configuration', JSON.stringify(body));
+  // A 404 is never an outage, even when an edge answered it: the path is ours.
+  assert.equal(classifyProviderFailure(await failureOf(respond('<html>404</html>', 404, 'text/html'))), 'request-rejected');
+  assert.equal(classifyProviderFailure(await failureOf(respond('<html>401</html>', 401, 'text/html'))), 'configuration');
+});

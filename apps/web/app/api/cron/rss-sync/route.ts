@@ -7,6 +7,9 @@
  * Schedule is managed by the repository deployment workflow.
  * Auth: Bearer CRON_SECRET only.
  * This job reports source counts and cache refreshes; it does not persist articles.
+ * Some sources failing is a degraded success (200, degraded:true). Every source
+ * failing only because it is unavailable answers the provider-unavailable
+ * contract (503, lib/cron-outcome.ts); any other total failure stays HTTP 500.
  */
 
 import { NextResponse } from "next/server";
@@ -24,6 +27,7 @@ import {
 } from "@/lib/cron-auth";
 import { safeErrorMessage } from "@/lib/api-input";
 import { runLeasedCron } from '@/lib/leased-cron';
+import { providerUnavailableResponse } from "@/lib/cron-outcome";
 import type { JobContext } from '../../../../../workers/src/lib/job-control';
 
 export const runtime = "nodejs";
@@ -79,6 +83,14 @@ async function synchronize(req: Request, job: JobContext) {
     error = safeErrorMessage(err);
   }
 
+  const failed = sourceHealth.filter((source) => !source.ok);
+  if (error && failed.length > 0 && failed.length === sourceHealth.length && failed.every((source) => source.unavailable === true))
+    return providerUnavailableResponse(start, {
+      route: "rss-sync",
+      provider: "news-sources",
+      error: `Every news source is unavailable (${failed.length}); the last good articles stay cached. The next run retries.`,
+      results: { total, sources: counts, sourceHealth, fetchMs },
+    });
   const report = buildReport(start, {
     ok: !error,
     route: "rss-sync",

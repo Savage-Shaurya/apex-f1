@@ -3,7 +3,7 @@ import { runLeasedJob, JobBudgetError, type JobContext, type Lease, type LeaseSt
 import { describeError } from '../../workers/src/lib/describe-error';
 import { buildReport, isAuthorizedCronRequest, logReport } from './cron-auth';
 import { logEvent } from './log';
-import { defaultCronStatusStore, finalizeCronResponse, type CronStatusStore } from './cron-outcome';
+import { defaultCronStatusStore, finalizeCronResponse, isDatabaseUnavailable, providerUnavailableResponse, type CronStatusStore } from './cron-outcome';
 
 const store: LeaseStore = { claim: claimJobLease, renew: renewJobLease, release: releaseJobLease };
 const BUDGET_MS = 45_000;
@@ -162,6 +162,11 @@ export async function runLeasedCron(
       return runUnleased('unavailable; cache-only run while the job database is unreachable');
     }
     const cause = describeError(failedClaim ? failedClaim.error : error);
+    // The job database is unreachable (not misconfigured): a provider outage like any other (cron-outcome.ts).
+    if (failedClaim && isDatabaseUnavailable(failedClaim.error)) {
+      logEvent('warn', 'cron.database_unavailable', { route, cause });
+      return finalizeCronResponse(route, providerUnavailableResponse(start, { route, provider: 'database', error: `Job database unreachable; no work was started and the next run retries. Cause: ${cause}` }), statusStore);
+    }
     logEvent('error', 'cron.exception', { route, cause });
     const report = buildReport(start, { ok: false, route, error: `Job ownership, storage or time budget unavailable; inspect the ingestion report and explicitly rerun. Cause: ${cause}` });
     logReport(report);

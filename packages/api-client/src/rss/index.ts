@@ -1,5 +1,5 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { ProviderError, failOr, isRecord, readLimitedText, withProviderDeadline, type ProviderRequestOptions } from '../transport';
+import { ProviderError, failOr, isProviderUnavailable, isRecord, providerHttpError, readLimitedText, withProviderDeadline, type ProviderRequestOptions } from '../transport';
 import { NEWS_CACHE_TAG, RSS_NEWS_CACHE_TAG } from '../cache-tags';
 import { hasXmlDoctype } from './xml-policy';
 import { apexUserAgent } from '../user-agent';
@@ -60,6 +60,8 @@ export interface NewsSourceReport {
   items: number;
   /** Only redacted provider errors, never an upstream URL or response body. */
   error?: string;
+  /** The failure was only the source being unavailable (timeout, 429, 5xx, edge page), not our bug or bad data. */
+  unavailable?: boolean;
 }
 
 export const F1_RSS_SOURCES: RssSource[] = [
@@ -289,7 +291,7 @@ async function fetchFeed(source: RssSource, revalidate: number, opts: ProviderRe
       signal,
       next: { revalidate, ...(opts.cacheTags?.length ? { tags: opts.cacheTags } : {}) },
     } as RequestInit);
-    if (!res.ok) throw new ProviderError('rss', 'http', res.status);
+    if (!res.ok) throw await providerHttpError('rss', res, signal);
     const xml = await readLimitedText(res, 2_000_000, signal);
     if (hasXmlDoctype(xml) || XMLValidator.validate(xml) !== true) throw new ProviderError('rss', 'invalid-response');
     return parseRss(xml, source.name);
@@ -389,7 +391,8 @@ export async function getF1NewsFeed(
     try { items = await operation(); }
     catch (error) {
       opts.onSourceResult?.({ source, ok: false, items: 0,
-        error: error instanceof ProviderError ? error.message : 'news-feed: unavailable' });
+        error: error instanceof ProviderError ? error.message : 'news-feed: unavailable',
+        unavailable: isProviderUnavailable(error) });
       return [];
     }
     succeeded++;

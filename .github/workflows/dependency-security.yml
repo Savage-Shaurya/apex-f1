@@ -2,6 +2,13 @@ name: Dependency security
 
 # Registry advisories can change while the committed lockfile stays unchanged.
 # This only checks dependencies; it never runs the application or cron routes.
+#
+# Registry outages (cron resilience, 2026-10-31; DEPLOY.md "Cron outcomes"): the install and the audit
+# run through scripts/ops/scheduled-job.mjs. A registry/network failure is retried (30 s, 90 s) and, if
+# npm is still down, the run ends green with a ::warning:: while the last verified audit is under 72 h
+# old, red otherwise. Advisories, lockfile, integrity and policy failures stay red at once.
+# Known limit: pnpm/action-setup itself downloads pnpm; if the registry is down at that step the run
+# fails red (a third-party action cannot be classified).
 on:
   schedule:
     - cron: '23 4 * * *'
@@ -9,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  actions: read # read earlier runs of this workflow for the last verified audit
 
 concurrency:
   group: dependency-security
@@ -17,7 +25,7 @@ concurrency:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -35,10 +43,22 @@ jobs:
 
       # Prevent dependency lifecycle scripts from executing in the audit job.
       - name: Install exact lockfile without lifecycle scripts
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        id: install
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ops/scheduled-job.mjs --job dependency-install --stale-after-hours=72 --npm-output -- pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Audit full and production dependency trees
-        run: pnpm run audit:checked
+        id: audit
+        if: steps.install.outputs.outcome == 'ok'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ops/scheduled-job.mjs --job dependency-security --stale-after-hours=72 -- pnpm run audit:checked
+
+      # Runs only after a complete audit that passed policy; a deferred (outage) run never records one.
+      - name: Record verified success
+        if: steps.audit.outputs.outcome == 'ok'
+        run: echo "Verified dependency audit recorded for the outage policy."
 
       - name: Retain dependency audit reports
         if: always()

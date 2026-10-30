@@ -8,6 +8,7 @@ import {
   type YTVideoDetail,
   type YouTubeFetchOpts,
 } from "@apex/api-client/youtube";
+import { isProviderUnavailable } from "@apex/api-client/jolpica";
 function safeErrorMessage(error: unknown): string {
   let text = error instanceof Error ? error.message : String(error);
   for (const [key, value] of Object.entries(process.env)) if (value && /SECRET|TOKEN|PASSWORD|API_KEY|DATABASE_URL|SERVICE_ROLE/i.test(key)) text = text.split(value).join('[redacted]');
@@ -47,6 +48,9 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
   const signal = AbortSignal.any([AbortSignal.timeout(30_000), ...(deps.signal ? [deps.signal] : [])]);
   const opts: YouTubeFetchOpts = { strict: true, signal, revalidate: 0 };
   const errors: string[] = [];
+  // Cron resilience: true while every failure so far was only YouTube being unavailable.
+  let outageOnly = true;
+  const note = (error: unknown) => { if (!isProviderUnavailable(error)) outageOnly = false; };
   signal.throwIfAborted();
   await deps.begin?.();
   signal.throwIfAborted();
@@ -61,6 +65,7 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
     if (stats.some((channel) => !configured.has(channel.channelId)) || new Set(stats.map((channel) => channel.channelId)).size !== stats.length) throw new Error('Channel metadata identity differs from configured channels.');
   } catch (error) {
     stats = [];
+    note(error);
     errors.push(`channel metadata: ${safeErrorMessage(error)}`);
   }
   const byId = new Map(stats.map((channel) => [channel.channelId, channel]));
@@ -73,6 +78,8 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
   }> = await Promise.all(
     deps.channels.map(async (channel) => {
       const playlistId = byId.get(channel.channelId)?.uploadsPlaylistId;
+      // Without metadata (already reported) the playlist is unknown; with metadata, a missing playlist is a data problem.
+      if (!playlistId && stats.length) outageOnly = false;
       if (!playlistId)
         return {
           ...channel,
@@ -88,6 +95,7 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
           videoIds: items.map((item) => item.videoId),
         };
       } catch (error) {
+        note(error);
         return {
           ...channel,
           uploadsChecked: 0,
@@ -104,7 +112,7 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
   try {
     verification = await deps.verifyStored?.(recentIds);
     if (verification && (verification.videoIds.length > 100 || verification.videoIds.some((id) => !/^[A-Za-z0-9_-]{11}$/.test(id)))) throw new Error('Invalid stored verification identities.');
-  } catch (error) { errors.push(`stored verification: ${safeErrorMessage(error)}`); }
+  } catch (error) { outageOnly = false; errors.push(`stored verification: ${safeErrorMessage(error)}`); }
   const ids = [...new Set([...recentIds, ...(verification?.videoIds ?? [])])];
   if (ids.length > 500) throw new Error('Video details exceeded the bounded collection size.');
   let videos: YTVideoDetail[] = [];
@@ -133,6 +141,7 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
       detailsComplete = true;
     } catch (error) {
       videos = [];
+      note(error);
       errors.push(`video details: ${safeErrorMessage(error)}`);
     }
   }
@@ -150,7 +159,7 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
       const result = await deps.reconcile({ requestedVideoIds: ids, publicVideos, unavailableVideoIds: ids.filter((id) => !publicIds.has(id)), ...(verification ? { verificationCursor: verification.nextAfterVideoId } : {}) });
       videosPersisted = result.persisted; videosMarkedUnavailable = result.unavailable;
       if (videosPersisted !== publicVideos.length) throw new Error('Video persistence did not confirm every public video.');
-    } catch (error) { errors.push(`persistence: ${safeErrorMessage(error)}`); }
+    } catch (error) { outageOnly = false; errors.push(`persistence: ${safeErrorMessage(error)}`); }
   } else if (detailsComplete && publicVideos.length) {
     try {
       videosPersisted = await deps.persist(publicVideos);
@@ -159,12 +168,16 @@ export async function syncRecentYouTubeUploads(deps: YouTubeSyncDependencies) {
           "Video persistence did not confirm every public video.",
         );
     } catch (error) {
+      outageOnly = false;
       errors.push(`persistence: ${safeErrorMessage(error)}`);
     }
   }
   const channelErrors = channels.filter((channel) => channel.error);
+  const ok = errors.length === 0 && channelErrors.length === 0;
   return {
-    ok: errors.length === 0 && channelErrors.length === 0,
+    ok,
+    /** Failed only because YouTube was unavailable (timeouts, 429/quota, 5xx): retry later. */
+    providerUnavailable: !ok && outageOnly,
     errors,
     channels: channels.map(({ channelId, name, uploadsChecked, error }) => ({
       channelId,

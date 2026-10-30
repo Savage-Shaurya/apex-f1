@@ -21,8 +21,10 @@ export class ProviderError extends Error {
 /**
  * Why a provider read failed (cron resilience, 2026-10-31):
  *  - provider-unavailable: the provider or its edge is down, overloaded or
- *    rate-limiting (timeouts, dropped connections, 408/425/429, 5xx, and a 4xx
- *    whose body is not the provider's own JSON answer). Temporary; retry later.
+ *    rate-limiting (timeouts, dropped connections, 408/425/429, 5xx, a quota
+ *    reply such as YouTube's quotaExceeded, and a 400/403 whose body is a
+ *    CDN/edge page rather than the provider's own JSON). Temporary; retry later.
+ *    A 404/405/410/422 is never an outage, whoever answered: the path is ours.
  *  - request-rejected: the provider itself refused our request (its JSON 4xx).
  *  - configuration: credentials or settings (401/403 from the provider, bad config).
  *  - invalid-data: the provider answered with data that fails validation.
@@ -40,8 +42,9 @@ export function classifyProviderFailure(error: unknown): ProviderFailureClass {
     case 'http': {
       const status = error.status ?? 0;
       if (status === 408 || status === 425 || status === 429 || status >= 500) return 'provider-unavailable';
-      if (error.origin === 'edge') return 'provider-unavailable';
-      return status === 401 || status === 403 ? 'configuration' : 'request-rejected';
+      if (status === 401) return 'configuration';
+      if ((status === 400 || status === 403) && error.origin === 'edge') return 'provider-unavailable';
+      return status === 403 ? 'configuration' : 'request-rejected';
     }
     default: return 'internal';
   }
@@ -52,27 +55,51 @@ export function isProviderUnavailable(error: unknown): boolean {
   return classifyProviderFailure(error) === 'provider-unavailable';
 }
 
+/** Google APIs (YouTube Data) answer a spent daily quota or a burst limit with 403 + one of these reasons. */
+const QUOTA_REASONS = new Set(['quotaExceeded', 'rateLimitExceeded', 'userRateLimitExceeded', 'dailyLimitExceeded']);
+
+function quotaReason(parsed: Record<string, unknown>): boolean {
+  const error = parsed.error;
+  if (!isRecord(error) || !Array.isArray(error.errors)) return false;
+  return error.errors.some((entry) => isRecord(entry) && typeof entry.reason === 'string' && QUOTA_REASONS.has(entry.reason));
+}
+
 /**
  * Peek (bounded: 4 KB, 1 s) at a failed response's body: the provider's own
  * JSON object means it rejected our request; HTML, text, an empty body or a
  * stalled read means a CDN/edge answered instead. The body is never kept.
  */
-async function failureOrigin(response: Response, signal: AbortSignal): Promise<'provider' | 'edge'> {
+async function failureOrigin(response: Response, signal: AbortSignal): Promise<{ origin: 'provider' | 'edge'; quota: boolean }> {
   if (!/^application\/(?:[a-z0-9.+-]+\+)?json\b/i.test(response.headers.get('content-type') ?? '')) {
     void response.body?.cancel().catch(() => undefined);
-    return 'edge';
+    return { origin: 'edge', quota: false };
   }
   const timer = new AbortController();
   const stop = setTimeout(() => timer.abort(), 1_000);
   try {
     const text = await readLimitedText(response, 4_096, AbortSignal.any([signal, timer.signal]));
     const parsed = JSON.parse(text) as unknown;
-    return isRecord(parsed) && Object.keys(parsed).length > 0 ? 'provider' : 'edge';
+    // Any JSON object (even {}) under a JSON content type is the provider's own answer; edges send pages.
+    if (!isRecord(parsed)) return { origin: 'edge', quota: false };
+    return { origin: 'provider', quota: quotaReason(parsed) };
   } catch {
-    return 'edge';
+    return { origin: 'edge', quota: false };
   } finally {
     clearTimeout(stop);
   }
+}
+
+/**
+ * The redacted error for a non-2xx response, with who answered it (provider
+ * JSON vs edge page) and a provider quota reply turned into 'rate-limit'.
+ * For transports that do not use requestJson (RSS, YouTube streaming reads).
+ */
+export async function providerHttpError(provider: string, response: Response, signal: AbortSignal): Promise<ProviderError> {
+  const retryAfter = retryAfterMs(response.headers.get('retry-after'));
+  const { origin, quota } = await failureOrigin(response, signal);
+  return quota
+    ? new ProviderError(provider, 'rate-limit', response.status, retryAfter, origin)
+    : new ProviderError(provider, 'http', response.status, retryAfter, origin);
 }
 
 /** Parse an HTTP Retry-After header (delta-seconds or HTTP-date), capped at one hour. */
@@ -202,10 +229,7 @@ export async function requestJson<T = unknown>(
 ): Promise<T> {
   return withProviderDeadline(provider, async (signal) => {
     const response = await (options.fetchImpl ?? fetch)(url.toString(), { redirect: 'error', ...init, signal });
-    if (!response.ok) {
-      const origin = await failureOrigin(response, signal);
-      throw new ProviderError(provider, 'http', response.status, retryAfterMs(response.headers.get('retry-after')), origin);
-    }
+    if (!response.ok) throw await providerHttpError(provider, response, signal);
     const text = await readLimitedText(response, options.maxBytes, signal);
     try { return JSON.parse(text) as T; }
     catch { throw new ProviderError(provider, 'invalid-response'); }

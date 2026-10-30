@@ -449,3 +449,87 @@ test("a loopback http origin is accepted for local checks; any other http origin
   for (const siteUrl of ["http://fixture.invalid", "http://localhost.evil.invalid", "http://10.0.0.1"])
     await assert.rejects(invokeCron({ ...configuration, siteUrl, fetchImpl: async () => healthy() }), /APEX_SITE_URL/);
 });
+
+// ---------- Owner hardening (2026-10-31): our own site failing, timing and clock edges ----------
+test("staleness threshold edges: 47 h 59 vs 48 h 01 (weather/weekend), 71 h 59 vs 72 h 01 (season)", async () => {
+  for (const [route, hours, expected] of [
+    ["weather-sync", 47 + 59 / 60, 0], ["weather-sync", 48 + 1 / 60, 1],
+    ["weekend-watch", 47 + 59 / 60, 0], ["weekend-watch", 48 + 1 / 60, 1],
+    ["rss-sync", 48 + 1 / 60, 1], ["youtube-sync", 47 + 59 / 60, 0],
+    ["jolpica-nightly", 71 + 59 / 60, 0], ["jolpica-nightly", 72 + 1 / 60, 1],
+  ]) {
+    const run = harness([outageReport(route, new Date(NOW - hours * HOUR).toISOString())]);
+    assert.equal(await runCronCommand([route], cronEnv, run.options), expected, `${route} ${hours.toFixed(3)} h`);
+  }
+  // A lastSuccessAt slightly in the future (runner clock behind the server) is tolerated up to 5 minutes.
+  assert.equal(await runCronCommand(["weather-sync"], cronEnv, harness([outageReport("weather-sync", new Date(NOW + 4 * 60_000).toISOString())]).options), 0);
+  assert.equal(await runCronCommand(["weather-sync"], cronEnv, harness([outageReport("weather-sync", new Date(NOW + 6 * 60_000).toISOString())]).options), 1);
+});
+
+test("our own site down (DNS, refused, Vercel 502/504) is retried and then RED, never masked as a provider outage", async () => {
+  for (const failure of [
+    () => { throw Object.assign(new TypeError("fetch failed"), { cause: { code: "ENOTFOUND" } }); },
+    () => { throw Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }); },
+    () => new Response("An error occurred with your deployment\n\nFUNCTION_INVOCATION_FAILED", { status: 502, headers: { "Content-Type": "text/plain" } }),
+    () => new Response("FUNCTION_INVOCATION_TIMEOUT", { status: 504, headers: { "Content-Type": "text/plain" } }),
+  ]) {
+    const run = harness([failure]);
+    assert.equal(await runCronCommand(["weather-sync"], cronEnv, run.options), 1);
+    assert.equal(run.calls(), 3, "retried");
+    assert.match(run.output.join("\n"), /::error::/);
+    assert.doesNotMatch(run.output.join("\n"), /::warning::/);
+    assert.match(run.summary.join("\n"), /failed/);
+  }
+  // Our function's own 500, Vercel's 503 page and a 503 JSON without the outage contract: red at once.
+  for (const response of [
+    Response.json({ ok: false, route: "weather-sync", error: "TypeError" }, { status: 500 }),
+    new Response("<html>DEPLOYMENT_PAUSED</html>", { status: 503, headers: { "Content-Type": "text/html" } }),
+    Response.json({ ok: false, route: "weather-sync", reason: "provider-unavailable" }, { status: 503 }),
+  ]) {
+    const run = harness([response]);
+    assert.equal(await runCronCommand(["weather-sync"], cronEnv, run.options), 1);
+    assert.equal(run.calls(), 1);
+  }
+});
+
+test("malformed reports are red: invalid JSON, wrong route, missing ok, oversized", async () => {
+  for (const response of [
+    new Response("{\"ok\":tr", { status: 200, headers: { "Content-Type": "application/json" } }),
+    new Response("{\"ok\":false,\"retryable\":tr", { status: 503, headers: { "Content-Type": "application/json" } }),
+    Response.json({ ok: true, route: "rss-sync" }),
+    Response.json({ route: "weather-sync" }),
+    new Response(JSON.stringify({ ok: true, route: "weather-sync", pad: "x".repeat(70_000) }), { status: 200, headers: { "Content-Type": "application/json" } }),
+  ]) {
+    const run = harness([response]);
+    assert.equal(await runCronCommand(["weather-sync"], cronEnv, run.options), 1);
+    assert.equal(run.calls(), 1);
+  }
+});
+
+test("fake clock: worst-case retries and continuations end inside every refresh workflow's timeout", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { RUN_BUDGET_MS, REQUEST_TIMEOUT_MS } = await import("./invoke-cron.mjs");
+  const SETUP_MS = 2 * 60_000; // checkout + setup-node, generous
+  for (const [file, args] of [
+    ["refresh-weather.yml", ["weather-sync"]], ["refresh-weekend.yml", ["weekend-watch"]], ["refresh-news.yml", ["rss-sync"]],
+    ["refresh-videos.yml", ["youtube-sync"]], ["refresh-season.yml", ["jolpica-nightly", "--until-complete=8"]],
+  ]) {
+    const yaml = await readFile(new URL(`../.github/workflows/${file}`, import.meta.url), "utf8");
+    const timeoutMs = Number(/timeout-minutes: (\d+)/.exec(yaml)[1]) * 60_000;
+    for (const scenario of ["outage", "continuation"]) {
+      let clock = NOW;
+      const run = harness([]);
+      run.options.now = () => clock;
+      run.options.sleep = async (ms) => { clock += ms; };
+      // Every request takes the full 65 s deadline before it answers.
+      run.options.fetchImpl = async () => {
+        clock += REQUEST_TIMEOUT_MS;
+        return scenario === "outage" ? outageReport(args[0], new Date(clock - HOUR).toISOString()) : Response.json({ ok: true, route: args[0], continuation: true });
+      };
+      assert.equal(await runCronCommand(args, cronEnv, run.options), 0, `${file} ${scenario}`);
+      const elapsed = clock - NOW;
+      assert.ok(elapsed <= RUN_BUDGET_MS + REQUEST_TIMEOUT_MS, `${file} ${scenario}: ${elapsed} ms`);
+      assert.ok(elapsed + SETUP_MS <= timeoutMs, `${file} ${scenario}: ${elapsed} ms + setup exceeds ${timeoutMs} ms`);
+    }
+  }
+});

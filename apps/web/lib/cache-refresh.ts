@@ -1,4 +1,6 @@
-import { revalidateTag } from 'next/cache';
+import { nextCache } from './next-cache';
+
+const revalidateTag = (tag: string, profile: string) => nextCache.revalidateTag(tag, profile);
 
 /**
  * Mark a cache tag stale without throwing its last good copy away (R3-BE-4).

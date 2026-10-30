@@ -40,8 +40,13 @@ export const STALE_AFTER_HOURS = {
 };
 /** Waits before the 2nd and 3rd attempt: three tries in all, inside the run budget. */
 export const RETRY_DELAYS_MS = [30_000, 90_000];
-/** Retries stop when the next wait plus a full request would pass this (job timeouts allow it). */
-export const RUN_BUDGET_MS = 8 * 60_000;
+/**
+ * Retries and continuations stop when the next wait plus a full request would
+ * pass this, so a run lasts at most RUN_BUDGET_MS + one request (about 8 min),
+ * inside every refresh workflow's timeout (scripts/cron-coverage.test.mjs checks).
+ */
+export const RUN_BUDGET_MS = 7 * 60_000;
+export { REQUEST_TIMEOUT_MS };
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 /** A clock-skew allowance; a lastSuccessAt further in the future is invalid. */
 const FUTURE_TOLERANCE_MS = 5 * 60_000;
@@ -353,6 +358,10 @@ export async function runCronCommand(
         appendSummary(`- ⚠️ \`${result.route}\` completed with degraded provider availability (for example, it used the last validated calendar).`);
       }
       if (!result.continuation) break;
+      if (run < runs && now() - started + (timeoutMs ?? REQUEST_TIMEOUT_MS) > budgetMs) {
+        log(`::notice::${result.route} deferred some work; the run budget is spent and the next scheduled run continues it.`);
+        break;
+      }
       if (run === runs)
         log(
           `::notice::${result.route} deferred some work within its time budget; the next scheduled run continues it.`,

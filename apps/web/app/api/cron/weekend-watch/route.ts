@@ -10,7 +10,7 @@
  * (503, lib/cron-outcome.ts). Any other failure stays HTTP 500.
  * Auth: Bearer CRON_SECRET only. Never sends email.
  */
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { nextCache } from '@/lib/next-cache';
 import { invalidateLocalJolpicaSeason, jolpica } from '@apex/api-client/jolpica';
 import { lastGoodRedisConfig } from '@apex/api-client/openf1';
 import { synchronizeActiveSeasons } from '../../../../../workers/src/lib/season-sync-plan';
@@ -68,9 +68,9 @@ export async function GET(request: Request) {
           invalidated.add(target.season);
           // This instance's validated copies of the season go; others expire within their 60 s weekend lifetime.
           await invalidateLocalJolpicaSeason(target.season, { current: true, finished: false }).catch(() => undefined);
-          revalidateTag(`jolpica:season:${target.season}`, { expire: 0 });
+          nextCache.revalidateTag(`jolpica:season:${target.season}`, { expire: 0 });
         }
-        for (const path of pathsFor(target, race)) revalidatePath(path);
+        for (const path of pathsFor(target, race)) nextCache.revalidatePath(path);
       },
       ...(databaseLease ? {
         ingest: async () => {
