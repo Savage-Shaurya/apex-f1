@@ -1,5 +1,6 @@
 import {
   ProviderError,
+  isFrameworkControlError,
   withProviderDeadline,
   type ProviderRequestOptions,
 } from "../transport";
@@ -15,6 +16,7 @@ import { BUILD_QUEUE_ALLOWANCE_MS, BUILD_READ_STORE_ENV, isBuildPhase } from "..
 import { createDiskBuildStore, type JolpicaBuildStore } from "./build-store";
 import { defaultJolpicaLastGoodStore, jolpicaKeyIsImmutable, type JolpicaLastGoodStore } from "./last-good";
 import { JOLPICA_MAX_BACKOFF_MS } from "./shared-admission";
+import { isRedisUnavailable, resetRedisBreakers } from "../redis-guard";
 
 /** How long an expired, validated copy may still be served while Jolpica is failing. */
 export const JOLPICA_STALE_IF_ERROR_MS = 6 * 3_600_000;
@@ -157,6 +159,8 @@ export class JolpicaRequestControl {
   reset(): void {
     this.invalidate(() => true);
     this.cooldowns.clear();
+    this.sharedAdmissionWarned = false;
+    resetRedisBreakers();
     this.starts = [];
     this.lastStart = -Infinity;
   }
@@ -205,15 +209,30 @@ export class JolpicaRequestControl {
       if (delay) await this.sleep(delay);
       if (signal.aborted || this.now() >= expires)
         throw new ProviderError("jolpica", "timeout");
-      const shared = this.config.sharedAdmission;
-      if (this.config.requireShared && !shared)
+      // Redis is optional (redis-guard.ts): `next build` never uses the shared
+      // admission (it runs on other machines with its own budget, and its
+      // 90 s queue allowance is longer than the 35 s lease, which refused every
+      // build read after reserving it), and a failing store (quota, auth,
+      // outage, malformed reply) leaves this read on the process-local pacing
+      // above (start gap + hourly starts), never fails it.
+      const shared = this.building() ? null : this.config.sharedAdmission;
+      if (this.config.requireShared && !this.config.sharedAdmission)
         throw new ProviderError("jolpica", "configuration");
       if (shared) {
         const owner = jolpicaAdmissionOwner();
         for (;;) {
           if (signal.aborted || this.now() >= expires)
             throw new ProviderError("jolpica", "timeout");
-          const reservation = await shared.reserve(owner, signal, scope);
+          let reservation: Awaited<ReturnType<JolpicaSharedAdmission["reserve"]>>;
+          try {
+            reservation = await shared.reserve(owner, signal, scope);
+          } catch (error) {
+            if (signal.aborted || this.now() >= expires)
+              throw new ProviderError("jolpica", "timeout");
+            if (isFrameworkControlError(error)) throw error;
+            this.noteSharedAdmissionFailure(error);
+            break;
+          }
           if (reservation.admitted) {
             sharedOwner = owner;
             if (
@@ -274,6 +293,15 @@ export class JolpicaRequestControl {
         }
       }
     }
+  }
+
+  /** One structured line per process when the shared admission store fails and reads go local. */
+  private sharedAdmissionWarned = false;
+  private noteSharedAdmissionFailure(error: unknown): void {
+    if (this.sharedAdmissionWarned) return;
+    this.sharedAdmissionWarned = true;
+    const kind = isRedisUnavailable(error) ? error.kind : "redis-unavailable";
+    console.warn(JSON.stringify({ event: "provider.jolpica.admission-local", kind }));
   }
 
   private remember(
@@ -451,7 +479,7 @@ export class JolpicaRequestControl {
             if (generation !== this.generation) return;
             this.remember(key, value, ttlSeconds, requestId);
             // Shared last-good copy for cold instances (F-02); best effort, never awaited by the page.
-            if (!unshared && started && this.config.lastGood)
+            if (!unshared && started && this.config.lastGood && !building)
               void this.config.lastGood.write(key, { storedAt: this.now(), value }).catch(() => undefined);
           },
           (error) => {
@@ -501,13 +529,7 @@ export const jolpicaRequestControl =
       : null,
     // Last-good copies shared by every instance while reads are refused (F-02).
     lastGood: defaultJolpicaLastGoodStore(),
-    // A local production build behind the loopback dev cache is paced by that
-    // cache instead of requiring the shared (Upstash) admission store.
-    requireShared:
-      !jolpicaBaseOverridden &&
-      (process.env.NODE_ENV === "production" ||
-        Boolean(
-          process.env.UPSTASH_REDIS_REST_URL ||
-          process.env.UPSTASH_REDIS_REST_TOKEN,
-        )),
+    // Redis is optional (2026-10-31): without Upstash, or while it fails, reads
+    // run on this process's pacing (260 ms start gap, 500 starts per hour).
+    requireShared: false,
   }));

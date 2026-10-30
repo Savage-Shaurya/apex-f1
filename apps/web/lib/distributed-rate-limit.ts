@@ -1,13 +1,16 @@
 import { scopedRedisKey } from '../../../packages/api-client/src/redis-scope';
+import { guardedRedisFetch } from '../../../packages/api-client/src/redis-guard';
 import { rateLimit, rateLimitSubject, type RateLimitOptions, type RateLimitResult } from './rate-limit';
 
 export interface SharedRateLimitOptions extends RateLimitOptions {
-  /**
-   * Retained for existing public form callers. This never permits a local
-   * replacement in deployment: all routes require an authoritative shared
-   * quota there. Undeployed development retains its coarse local brake.
-   */
+  /** Retained for existing callers; every bucket now falls back to the in-memory limiter (below). */
   localFallback?: boolean;
+  /**
+   * Refuse (503) instead of falling back when the shared store is missing or
+   * failing. For administrator authentication, whose sessions live in Redis
+   * anyway: without Redis nobody can sign in, so nothing is lost by refusing.
+   */
+  failClosed?: boolean;
 }
 
 export interface SharedRateLimitResult extends RateLimitResult {
@@ -70,19 +73,20 @@ function sharedConfig(): { url: string; token: string } | null {
   }
 }
 
-function mayUseLocalStore(): boolean {
-  const required = process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED?.trim().toLowerCase();
-  // Unknown flag values fail closed rather than silently accepting a
-  // misspelled requirement.
-  const notRequired = required === undefined || required === '' || required === 'false';
-  if (!notRequired) return false;
-  // NODE_ENV alone is insufficient: a deployed development-mode process must
-  // not get an in-memory replacement for a shared quota.
+/**
+ * Redis is optional (2026-10-31). When the shared store is missing or failing
+ * (quota, auth, outage, malformed reply), every bucket keeps a limit: this
+ * instance's in-memory fixed window with the same limit and window. Reads
+ * therefore stay open, and writes (newsletter, predictions, articles, image
+ * generation) stay limited, never unlimited. Only `failClosed` buckets
+ * (administrator authentication) answer 503 instead.
+ */
+function undeployedDevelopment(): boolean {
   return process.env.NODE_ENV === 'development' && !process.env.VERCEL && !process.env.VERCEL_ENV;
 }
 
 function unavailable(req: Request, opts: SharedRateLimitOptions): SharedRateLimitResult {
-  if (mayUseLocalStore()) {
+  if (!opts.failClosed || undeployedDevelopment()) {
     return { ...rateLimit(req, opts), available: true, store: 'local' };
   }
   return {
@@ -145,9 +149,8 @@ async function readResult(response: Response, opts: RateLimitOptions, signal: Ab
  * Global fixed-window quota using the Upstash Redis REST API and atomic EVAL.
  * No network/config/error details are logged or returned. The full HTTP/body
  * operation is bounded to 3 seconds and redirects cannot forward credentials.
- * Set DISTRIBUTED_RATE_LIMIT_REQUIRED=true in production. Missing/broken shared
- * storage fails closed in every deployed environment, even if the flag is unset;
- * only explicit undeployed local development can use the existing coarse brake.
+ * Missing/broken shared storage falls back to the in-memory limiter (see
+ * `unavailable`), except for `failClosed` buckets, which answer 503.
  */
 export async function rateLimitShared(req: Request, opts: SharedRateLimitOptions): Promise<SharedRateLimitResult> {
   validateOptions(opts);
@@ -165,7 +168,9 @@ export async function rateLimitShared(req: Request, opts: SharedRateLimitOptions
   try {
     const key = scopedRedisKey(`apex:rl:v1:${opts.bucket}:${opts.limit}:${opts.windowMs}:${rateLimitSubject(req, opts)}`);
     const operation = (async () => {
-      const response = await fetch(config.url, {
+      // Guarded (redis-guard.ts): a quota/auth/outage reply opens this process's breaker,
+      // so later requests go straight to the in-memory limiter without a network call.
+      const response = await guardedRedisFetch('rate-limit')(config.url, {
         method: 'POST',
         headers: { authorization: `Bearer ${config.token}`, 'content-type': 'application/json' },
         body: JSON.stringify(['EVAL', FIXED_WINDOW_SCRIPT, '1', key, String(opts.limit), String(opts.windowMs)]),

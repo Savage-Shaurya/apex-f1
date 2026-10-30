@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
+import { resetRedisBreakers } from '../../../packages/api-client/src/redis-guard';
 import { rateLimitShared, rateLimitUnavailable } from '../lib/distributed-rate-limit';
 import { tooMany, type RateLimitOptions } from '../lib/rate-limit';
 
@@ -8,6 +9,8 @@ const originalEnv = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 const originalNow = Date.now;
 const OPTIONS = { limit: 5, windowMs: 60_000, bucket: 'shared-test' };
+/** Administrator-style bucket: refuses (503) instead of the in-memory fallback (Redis optional, 2026-10-31). */
+const CLOSED = { ...OPTIONS, failClosed: true };
 const TOKEN = 'synthetic-upstash-token';
 
 beforeEach(() => {
@@ -16,6 +19,7 @@ beforeEach(() => {
     UPSTASH_REDIS_REST_URL: 'https://synthetic-store.upstash.io',
     UPSTASH_REDIS_REST_TOKEN: TOKEN, DISTRIBUTED_RATE_LIMIT_REQUIRED: 'true',
   });
+  resetRedisBreakers();
   // Every test owns its HTTP fixture. An accidental real request fails loudly.
   globalThis.fetch = async () => { throw new Error('External network forbidden in limiter tests'); };
 });
@@ -130,7 +134,10 @@ test('untrusted proxy headers cannot manufacture separate quotas outside Vercel'
   assert.equal(results.filter((result) => result.ok).length, 5);
 });
 
-test('missing shared config fails closed in production and previews even with requirement unset or false', async () => {
+// Redis is optional (incident 2026-10-31): the shared store missing or failing never
+// removes a limit. Every bucket keeps this instance's in-memory window (same limit);
+// only failClosed buckets (administrator authentication) refuse with 503.
+test('missing shared config: every deployment keeps an in-memory limit; failClosed buckets refuse', async () => {
   let calls = 0;
   globalThis.fetch = async () => { calls += 1; throw new Error('must not fetch'); };
   for (const required of [undefined, 'false', 'true']) {
@@ -139,105 +146,50 @@ test('missing shared config fails closed in production and previews even with re
     for (const deployment of ['production', 'preview']) {
       process.env.VERCEL_ENV = deployment;
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
-      const result = await rateLimitShared(request(), OPTIONS);
-      assert.equal(result.ok, false);
-      assert.equal(result.available, false);
-      assert.equal(result.store, 'unavailable');
+      const opts = { ...OPTIONS, limit: 1, bucket: `noconf-${deployment}-${required ?? 'unset'}` };
+      const allowed = await rateLimitShared(request(), opts);
+      const denied = await rateLimitShared(request(), opts);
+      assert.equal(allowed.store, 'local'); assert.equal(allowed.ok, true); assert.equal(allowed.available, true);
+      assert.equal(denied.ok, false, 'never unlimited');
+      const closed = await rateLimitShared(request(), { ...CLOSED, bucket: `noconf-closed-${deployment}` });
+      assert.equal(closed.available, false);
+      assert.equal(closed.store, 'unavailable');
+      assert.equal(rateLimitUnavailable(closed).status, 503);
     }
   }
   assert.equal(calls, 0);
 });
 
-test('opted-in public forms preserve the undeployed development quota while an explicit requirement fails closed', async () => {
-  let calls = 0;
-  globalThis.fetch = async () => { calls += 1; throw new Error('must not fetch'); };
+test('undeployed local development keeps the coarse brake for every bucket, including failClosed ones', async () => {
   Object.assign(process.env, { NODE_ENV: 'development' });
   delete process.env.VERCEL;
   delete process.env.VERCEL_ENV;
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
-  for (const required of ['true', 'tru']) {
-    process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED = required;
-    const result = await rateLimitShared(request(), { ...OPTIONS, localFallback: true, bucket: `required-form-${required}` });
-    assert.equal(result.available, false);
-    assert.equal(result.store, 'unavailable');
-  }
-  for (const required of [undefined, 'false']) {
-    if (required === undefined) delete process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED;
-    else process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED = required;
-    const opts = { ...OPTIONS, limit: 1, localFallback: true, bucket: `local-form-${required ?? 'unset'}` };
+  for (const opts of [{ ...OPTIONS, limit: 1, bucket: 'dev-open' }, { ...CLOSED, limit: 1, bucket: 'dev-closed' }]) {
     const allowed = await rateLimitShared(request(), opts);
     const denied = await rateLimitShared(request(), opts);
-    assert.equal(allowed.store, 'local');
-    assert.equal(allowed.ok, true);
+    assert.equal(allowed.store, 'local'); assert.equal(allowed.ok, true);
     assert.equal(denied.ok, false);
   }
-  assert.equal(calls, 0);
 });
 
-test('only explicit undeployed local development may fall back to the existing coarse brake', async () => {
-  Object.assign(process.env, { NODE_ENV: 'development', DISTRIBUTED_RATE_LIMIT_REQUIRED: 'false' });
-  delete process.env.VERCEL;
-  delete process.env.VERCEL_ENV;
-  delete process.env.UPSTASH_REDIS_REST_URL;
-  delete process.env.UPSTASH_REDIS_REST_TOKEN;
-  const opts = { ...OPTIONS, bucket: 'only-local-development', limit: 1 };
-  const allowed = await rateLimitShared(request(), opts);
-  const denied = await rateLimitShared(request(), opts);
-  assert.equal(allowed.available, true);
-  assert.equal(allowed.store, 'local');
-  assert.equal(allowed.ok, true);
-  assert.equal(denied.available, true);
-  assert.equal(denied.ok, false);
-  process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED = 'true';
-  assert.equal((await rateLimitShared(request(), opts)).available, false);
-  process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED = 'tru';
-  assert.equal((await rateLimitShared(request(), opts)).available, false);
-  process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED = 'false';
-  process.env.VERCEL_ENV = 'preview';
-  assert.equal((await rateLimitShared(request(), opts)).available, false);
-});
-
-test('public form fallback flags cannot bypass a missing shared quota in deployments or direct production', async () => {
-  delete process.env.UPSTASH_REDIS_REST_TOKEN;
-  for (const required of [undefined, '', 'false', 'true']) {
-    if (required === undefined) delete process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED;
-    else process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED = required;
-    for (const environment of [
-      { NODE_ENV: 'production', VERCEL: '1', VERCEL_ENV: 'production' },
-      { NODE_ENV: 'production', VERCEL: '1', VERCEL_ENV: 'preview' },
-      { NODE_ENV: 'development', VERCEL: '1', VERCEL_ENV: undefined },
-      { NODE_ENV: 'development', VERCEL: undefined, VERCEL_ENV: 'preview' },
-      { NODE_ENV: 'production', VERCEL: undefined, VERCEL_ENV: undefined },
-    ]) {
-      for (const [key, value] of Object.entries(environment)) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      }
-      const result = await rateLimitShared(request(), { ...OPTIONS, localFallback: true });
-      assert.equal(result.available, false, JSON.stringify(environment));
-      assert.equal(result.ok, false);
-      assert.equal(result.store, 'unavailable');
-      assert.equal(rateLimitUnavailable(result).status, 503);
-    }
-  }
-});
-
-test('public forms fail closed when a configured shared store errors, with or without a required flag', async () => {
-  for (const required of [undefined, 'false', 'true']) {
-    if (required === undefined) delete process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED;
-    else process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED = required;
-    for (const reply of [
-      async () => { throw new Error('synthetic quota outage'); },
-      async () => new Response('{}', { status: 503 }),
-      async () => Response.json({ result: [1, 0] }),
-    ]) {
-      globalThis.fetch = reply;
-      const result = await rateLimitShared(request(), { ...OPTIONS, localFallback: true });
-      assert.equal(result.available, false);
-      assert.equal(result.ok, false);
-      assert.equal(result.store, 'unavailable');
-      assert.equal(rateLimitUnavailable(result).status, 503);
-    }
+test('a configured shared store that errors falls back to the in-memory limit (never unlimited); failClosed refuses', async () => {
+  for (const reply of [
+    async () => { throw new Error('synthetic quota outage'); },
+    async () => new Response('{}', { status: 503 }),
+    async () => Response.json({ result: [1, 0] }),
+    async () => new Response(JSON.stringify({ error: 'ERR max requests limit exceeded. Limit: 500000, Usage: 500002' }), { status: 400 }),
+  ]) {
+    resetRedisBreakers();
+    globalThis.fetch = reply;
+    const opts = { ...OPTIONS, limit: 2, bucket: `errors-${Math.random().toString(36).slice(2)}` };
+    const results = [];
+    for (let i = 0; i < 3; i++) results.push(await rateLimitShared(request(), opts));
+    assert.deepEqual(results.map((r) => [r.store, r.ok]), [['local', true], ['local', true], ['local', false]]);
+    const closed = await rateLimitShared(request(), CLOSED);
+    assert.equal(closed.available, false);
+    assert.equal(closed.ok, false);
+    assert.equal(rateLimitUnavailable(closed).status, 503);
   }
 });
 
@@ -255,7 +207,7 @@ test('insecure URLs, private hosts, credentials, misleading domains and command 
   ];
   for (const url of urls) {
     process.env.UPSTASH_REDIS_REST_URL = url;
-    const result = await rateLimitShared(request(), OPTIONS);
+    const result = await rateLimitShared(request(), CLOSED);
     assert.equal(result.available, false, url);
   }
   assert.equal(calls, 0);
@@ -266,7 +218,7 @@ test('missing or malformed bearer tokens are rejected before HTTP', async () => 
   globalThis.fetch = async () => { calls += 1; throw new Error('must not fetch'); };
   for (const token of ['', 'two words', 'token\r\nInjected: value', 'a'.repeat(4_097)]) {
     process.env.UPSTASH_REDIS_REST_TOKEN = token;
-    assert.equal((await rateLimitShared(request(), OPTIONS)).available, false);
+    assert.equal((await rateLimitShared(request(), CLOSED)).available, false);
   }
   assert.equal(calls, 0);
 });
@@ -292,14 +244,15 @@ test('HTTP errors, store errors, broken JSON and invalid quota replies never bec
     () => Response.json({ result: [1, 60_000], padding: 'a'.repeat(5_000) }),
   ];
   for (const fixture of fixtures) {
+    resetRedisBreakers();
     globalThis.fetch = async () => fixture();
-    const result = await rateLimitShared(request(), OPTIONS);
+    const result = await rateLimitShared(request(), CLOSED);
     assert.equal(result.available, false);
     assert.equal(result.ok, false);
     assert.equal(JSON.stringify(result).includes(TOKEN), false);
   }
   globalThis.fetch = async () => { throw new Error(`Network failed with ${TOKEN}`); };
-  assert.equal((await rateLimitShared(request(), OPTIONS)).available, false);
+  assert.equal((await rateLimitShared(request(), CLOSED)).available, false);
 });
 
 test('a hanging fetch is aborted and fails closed at the three-second deadline', async (t) => {
@@ -309,7 +262,7 @@ test('a hanging fetch is aborted and fails closed at the three-second deadline',
     signal = init?.signal ?? undefined;
     return new Promise<Response>(() => {});
   };
-  const pending = rateLimitShared(request(), OPTIONS);
+  const pending = rateLimitShared(request(), CLOSED);
   let settled = false;
   void pending.then(() => { settled = true; });
   t.mock.timers.tick(2_999);
@@ -328,7 +281,7 @@ test('the same deadline covers a response body that never finishes', async (t) =
     start(controller) { controller.enqueue(new TextEncoder().encode('{"result":')); },
     cancel() { cancelled = true; },
   }));
-  const pending = rateLimitShared(request(), OPTIONS);
+  const pending = rateLimitShared(request(), CLOSED);
   await Promise.resolve();
   await Promise.resolve();
   t.mock.timers.tick(3_000);
@@ -355,7 +308,7 @@ test('quota exhaustion returns standard 429 headers; store failure is a generic 
   assert.equal(denied.headers.get('x-ratelimit-limit'), '5');
   assert.equal(denied.headers.get('x-ratelimit-remaining'), '0');
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
-  const unavailable = rateLimitUnavailable(await rateLimitShared(request(), OPTIONS));
+  const unavailable = rateLimitUnavailable(await rateLimitShared(request(), CLOSED));
   assert.equal(unavailable.status, 503);
   assert.equal(unavailable.headers.get('retry-after'), '30');
   assert.equal(unavailable.headers.get('cache-control'), 'no-store');

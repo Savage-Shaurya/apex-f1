@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { requestJson, untrackedFetch } from '../transport';
 import { scopedRedisKey } from '../redis-scope';
+import { guardedRedisFetch } from '../redis-guard';
+import { isBuildPhase } from '../build-phase';
 
 /**
  * Last-good snapshots of OpenF1 responses.
@@ -110,7 +112,7 @@ export function createRedisLastGoodStore(config: LastGoodRedisConfig, options: {
     cache: 'no-store',
   // Untracked like the Jolpica Redis transport: a no-store fetch seen by Next during an ISR
   // render throws "Page changed from static to dynamic at runtime" and fails the whole page.
-  }, { fetchImpl: options.fetch ?? untrackedFetch(), timeoutMs: 2000, maxBytes: OPENF1_LAST_GOOD_MAX_BYTES + 4096 });
+  }, { fetchImpl: guardedRedisFetch('openf1-last-good', options.fetch ?? untrackedFetch()), timeoutMs: 2000, maxBytes: OPENF1_LAST_GOOD_MAX_BYTES + 4096 });
   return {
     async read(key) {
       if (!/^[a-f0-9]{64}$/.test(key)) return null;
@@ -167,7 +169,8 @@ const processGlobals = globalThis as typeof globalThis & { __apexOpenF1LastGood?
 /** The process-wide store: memory plus Redis when configured. */
 export function defaultOpenF1LastGoodStore(): OpenF1LastGoodStore {
   if (!processGlobals.__apexOpenF1LastGood) {
-    const redis = lastGoodRedisConfig();
+    // `next build` keeps its snapshots in memory only: no Redis commands per build (2026-10-31).
+    const redis = isBuildPhase() ? null : lastGoodRedisConfig();
     const memory = createMemoryLastGoodStore();
     processGlobals.__apexOpenF1LastGood = redis ? createLayeredLastGoodStore([memory, createRedisLastGoodStore(redis)]) : memory;
   }

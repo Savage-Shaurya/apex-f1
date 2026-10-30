@@ -1,4 +1,5 @@
 import { scopedRedisKey } from '../../../packages/api-client/src/redis-scope';
+import { guardedRedisFetch } from '../../../packages/api-client/src/redis-guard';
 import { createHash } from 'node:crypto';
 import { isProviderUnavailable, untrackedFetch } from '../../../packages/api-client/src/transport';
 import { weekendWatchTargets, type RaceTimes, type WatchTarget } from './data-freshness';
@@ -50,8 +51,9 @@ export function watchKey(target: Pick<WatchTarget, 'season' | 'round' | 'kind'>)
 
 /** Upstash REST store; calls are bounded (2 s) and a failed read counts as "unknown" (treated as changed). */
 export function redisFingerprintStore(config: { url: string; token: string }, fetchImpl: typeof fetch = untrackedFetch()): FingerprintStore {
+  const guarded = guardedRedisFetch('weekend-watch', fetchImpl);
   const call = async (command: string[]): Promise<unknown> => {
-    const response = await fetchImpl(config.url, {
+    const response = await guarded(config.url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(command),

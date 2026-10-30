@@ -1,8 +1,8 @@
 import { scopedRedisKey } from '../../../packages/api-client/src/redis-scope';
+import { guardedRedisFetch, redisFailureOf, RedisUnavailableError } from '../../../packages/api-client/src/redis-guard';
 import { MAX_LIVE_SNAPSHOT_BYTES, sanitizeLiveFrames } from './live-frame-schema';
 import type { LiveFrame } from './live-session-hub';
 import { randomUUID } from 'node:crypto';
-import { untrackedFetch } from '../../../packages/api-client/src/transport';
 
 export const LIVE_LEASE_MS = 15_000;
 export const LIVE_REQUEST_GAP_MS = 2_300;
@@ -102,7 +102,8 @@ export function createUpstashRedisTransport(config: LiveStoreConfig, options: { 
   if (!validated) throw new TypeError('Invalid live store configuration');
   // Untracked: Redis coordination is not page data. A no-store fetch seen by Next during an
   // ISR render throws "Page changed from static to dynamic at runtime" and fails the page.
-  const fetcher = options.fetch ?? untrackedFetch();
+  // Guarded (redis-guard.ts): quota/auth/outage replies open this process's breaker.
+  const fetcher = guardedRedisFetch('live-store', options.fetch);
   const timeoutMs = options.timeoutMs ?? 3_000;
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 3_000) throw new TypeError('Invalid live store deadline');
   const maxBytes = options.maxBytes ?? 196_608;
@@ -116,7 +117,8 @@ export function createUpstashRedisTransport(config: LiveStoreConfig, options: { 
     let interrupt: (error: Error) => void = () => {};
     const deadline = new Promise<never>((_resolve, reject) => {
       interrupt = reject;
-      timer = setTimeout(() => { controller.abort(); reject(new Error('Live shared store unavailable')); }, timeoutMs);
+      // A store that does not answer in time is unavailable Redis, not our bug (redis-guard.ts).
+      timer = setTimeout(() => { controller.abort(); reject(new RedisUnavailableError('redis-unavailable', 'live-store')); }, timeoutMs);
     });
     const abort = () => { controller.abort(signal.reason); interrupt(new Error('Live shared store unavailable')); };
     signal.addEventListener('abort', abort, { once: true });
@@ -168,7 +170,8 @@ export function createUpstashRedisTransport(config: LiveStoreConfig, options: { 
       return (data as { result: unknown }).result;
     })();
     try { return await Promise.race([operation, deadline]); }
-    catch { throw new Error('Live shared store unavailable'); }
+    // The Redis failure (if any) rides along as `cause`, so callers can degrade to local work.
+    catch (error) { const redis = redisFailureOf(error); throw redis ? new Error('Live shared store unavailable', { cause: redis }) : new Error('Live shared store unavailable'); }
     finally {
       clearTimeout(timer); signal.removeEventListener('abort', abort); controller.abort();
       // A canceled queued command cannot open the gate past its still-active

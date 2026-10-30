@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { requestJson, untrackedFetch } from '../transport';
+import { guardedRedisFetch } from '../redis-guard';
 import { jolpicaRedisConfig, jolpicaRedisPrefix, type JolpicaRedisConfig } from './shared-admission';
 
 /**
@@ -25,8 +26,14 @@ export interface JolpicaLastGoodStore {
 
 export const JOLPICA_LAST_GOOD_MAX_BYTES = 900_000;
 export const JOLPICA_LAST_GOOD_TTL_S = 30 * 86_400;
-/** One instance rewrites the same key at most this often (bounds Redis commands). */
-export const JOLPICA_LAST_GOOD_WRITE_INTERVAL_MS = 10 * 60_000;
+/**
+ * One instance rewrites the same key at most this often (bounds Redis commands;
+ * 2026-10-31: was 10 min). A copy is a fallback for the 6 h stale-if-error
+ * window, so an hourly refresh keeps it well inside that window.
+ */
+export const JOLPICA_LAST_GOOD_WRITE_INTERVAL_MS = 60 * 60_000;
+/** A completed season or a fixed record never changes: one write a day per instance is plenty. */
+export const JOLPICA_LAST_GOOD_IMMUTABLE_WRITE_INTERVAL_MS = 24 * 60 * 60_000;
 
 function digest(key: string): string {
   return createHash('sha256').update(key).digest('hex');
@@ -49,7 +56,7 @@ export function createRedisJolpicaLastGoodStore(
     body: JSON.stringify(command),
     cache: 'no-store',
   // Untracked: a no-store control request must not make an ISR render dynamic.
-  }, { fetchImpl: options.fetch ?? untrackedFetch(), timeoutMs: options.timeoutMs ?? 1_500, maxBytes: JOLPICA_LAST_GOOD_MAX_BYTES + 4096 });
+  }, { fetchImpl: guardedRedisFetch('jolpica-last-good', options.fetch ?? untrackedFetch()), timeoutMs: options.timeoutMs ?? 1_500, maxBytes: JOLPICA_LAST_GOOD_MAX_BYTES + 4096 });
   const lastWrite = new Map<string, number>();
   return {
     async read(key) {
@@ -62,7 +69,8 @@ export function createRedisJolpicaLastGoodStore(
     },
     async write(key, entry) {
       const previous = lastWrite.get(key);
-      if (previous !== undefined && entry.storedAt - previous < JOLPICA_LAST_GOOD_WRITE_INTERVAL_MS) return;
+      const interval = jolpicaKeyIsImmutable(key, entry.storedAt) ? JOLPICA_LAST_GOOD_IMMUTABLE_WRITE_INTERVAL_MS : JOLPICA_LAST_GOOD_WRITE_INTERVAL_MS;
+      if (previous !== undefined && entry.storedAt - previous < interval) return;
       const text = JSON.stringify({ key, storedAt: entry.storedAt, value: entry.value });
       if (new TextEncoder().encode(text).byteLength > JOLPICA_LAST_GOOD_MAX_BYTES) return;
       lastWrite.set(key, entry.storedAt);

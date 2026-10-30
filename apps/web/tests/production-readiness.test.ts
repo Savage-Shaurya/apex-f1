@@ -96,7 +96,9 @@ test('health route exists, is dynamic, rate-limited and never cached', () => {
   assert.ok(existsSync(file), 'app/api/health/route.ts');
   const source = readFileSync(file, 'utf8');
   assert.match(source, /export async function GET/);
-  assert.match(source, /rateLimitShared\(/);
+  // Per-instance brake: a health check never spends a Redis command (2026-10-31).
+  assert.match(source, /rateLimit\(/);
+  assert.doesNotMatch(source, /rateLimitShared\(/);
   assert.match(source, /no-store/);
   assert.match(source, /dynamic = 'force-dynamic'/);
 });

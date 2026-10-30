@@ -115,29 +115,20 @@ test("malformed Redis shapes and upstream errors fail closed", async () => {
   );
 });
 
-test("configured admission failure and missing required shared store start zero provider requests", async () => {
+test("an explicitly required but missing shared store starts zero provider requests; a failing store degrades to local pacing (Redis optional, 2026-10-31)", async () => {
   let calls = 0;
-  for (const sharedAdmission of [
-    null,
-    {
-      reserve: async () => {
-        throw new ProviderError("jolpica", "configuration");
-      },
-      complete: async () => {},
-    },
-  ]) {
-    const control = new JolpicaRequestControl({
-      requireShared: true,
-      sharedAdmission,
-    });
-    await assert.rejects(
-      control.readThrough("fixture", 0, {}, async () => {
-        calls++;
-        return "should not run";
-      }),
-    );
-  }
+  const required = new JolpicaRequestControl({ requireShared: true, sharedAdmission: null });
+  await assert.rejects(required.readThrough("fixture", 0, {}, async () => { calls++; return "should not run"; }));
   assert.equal(calls, 0);
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const failing = new JolpicaRequestControl({
+      sharedAdmission: { reserve: async () => { throw new ProviderError("jolpica", "configuration"); }, complete: async () => {} },
+    });
+    assert.equal(await failing.readThrough("fixture", 0, {}, async () => { calls++; return "local"; }), "local");
+  } finally { console.warn = warn; }
+  assert.equal(calls, 1);
 });
 
 test("cold shared read consumes admission once, warm process cache consumes none, fresh reads consume another", async () => {

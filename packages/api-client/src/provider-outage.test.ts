@@ -67,8 +67,11 @@ test('the shared admission store (Upstash) reports its own failures, never as a 
     { fetch: respond('{"error":"ERR max requests limit exceeded"}', 400, 'application/json') },
   );
   const error = await execute(['PING'], new AbortController().signal).then(() => assert.fail('should fail'), (failure: unknown) => failure);
-  assert.ok(error instanceof ProviderError);
-  assert.equal(error.provider, 'jolpica-admission');
+  // Redis is optional (2026-10-31): its own class, never a provider outage, never a Jolpica answer.
+  assert.ok(error instanceof Error);
+  assert.equal(error.name, 'RedisUnavailableError');
+  assert.equal(classifyProviderFailure(error), 'redis-unavailable');
+  assert.match(error.message, /^jolpica-admission: redis-quota/);
   assert.equal(isProviderUnavailable(error), false);
   assert.doesNotMatch(error.message, /synthetic-token|max requests/);
 });

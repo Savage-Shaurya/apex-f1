@@ -1,6 +1,7 @@
 import { jolpica, mapRace, type FetchOpts, type UiRace } from '@apex/api-client/jolpica';
 import { lastGoodRedisConfig } from '@apex/api-client/openf1';
 import { scopedRedisKey } from '../../../packages/api-client/src/redis-scope';
+import { guardedRedisFetch } from '../../../packages/api-client/src/redis-guard';
 import { isProviderUnavailable, untrackedFetch } from '../../../packages/api-client/src/transport';
 import { buildReport, logReport, type CronReport } from './cron-auth';
 
@@ -151,8 +152,10 @@ export function forgetCronSuccessesInProcess(): void { memory().clear(); }
  */
 export function defaultCronStatusStore(env: Readonly<Record<string, string | undefined>> = process.env, fetchImpl: typeof fetch = untrackedFetch()): CronStatusStore {
   const redis = lastGoodRedisConfig(env);
+  // Guarded (redis-guard.ts): an open breaker answers at once; a failed read is "unknown".
+  const guarded = guardedRedisFetch('cron-status', fetchImpl);
   const call = async (command: string[]): Promise<unknown> => {
-    const response = await fetchImpl(redis!.url, {
+    const response = await guarded(redis!.url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${redis!.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(command),

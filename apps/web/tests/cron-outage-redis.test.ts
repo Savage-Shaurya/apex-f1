@@ -30,17 +30,22 @@ const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 // Test fixture: one race 40 days out (outside the forecast horizon, so no Open-Meteo read).
 const calendar = { MRData: { xmlns: '', series: 'f1', url: 'https://api.jolpi.ca/ergast/f1/current.json', limit: '100', offset: '0', total: '1', RaceTable: { season: String(YEAR), Races: [{ season: String(YEAR), round: '1', raceName: 'Fixture Grand Prix', url: 'https://example.invalid/race', date: isoDay(NOW + 40 * DAY), time: '14:00:00Z', Circuit: { circuitId: 'fixture', circuitName: 'Fixture Circuit', url: 'https://example.invalid/circuit', Location: { lat: '19.4', long: '-99.09', locality: 'Fixture', country: 'Fixture' } } }] } } };
 
-let redis: 'healthy' | 'down' | 'slow' = 'healthy';
+let redis: 'healthy' | 'down' | 'slow' | 'quota' | 'auth' | 'garbage' = 'healthy';
 let jolpica: 'healthy' | 'down' = 'healthy';
 const store = new Map<string, string>();
 const keysWritten: string[] = [];
+let commandCount = 0;
 const originalFetch = globalThis.fetch;
 
 before(async () => {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     if (url.hostname === 'fixture-db.upstash.io') {
+      commandCount += 1;
       if (redis === 'down') throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('ECONNREFUSED'), { code: 'ECONNREFUSED' }) });
+      if (redis === 'quota') return new Response(JSON.stringify({ error: 'ERR max requests limit exceeded. Limit: 500000, Usage: 500002' }), { status: 400, headers: { 'content-type': 'application/json' } });
+      if (redis === 'auth') return Response.json({ error: 'WRONGPASS' }, { status: 401 });
+      if (redis === 'garbage') return new Response('<html>nope</html>', { status: 200, headers: { 'content-type': 'text/html' } });
       if (redis === 'slow') await new Promise((resolve, reject) => { const timer = setTimeout(resolve, 3_000); init?.signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new DOMException('aborted', 'AbortError')); }, { once: true }); });
       const command = JSON.parse(String(init?.body)) as string[];
       const [name] = command;
@@ -66,7 +71,7 @@ before(async () => {
   forget = (await import('../lib/cron-outcome')).forgetCronSuccessesInProcess;
 });
 after(() => { globalThis.fetch = originalFetch; });
-beforeEach(() => { reset(); forget(); store.clear(); keysWritten.length = 0; redis = 'healthy'; jolpica = 'healthy'; });
+beforeEach(() => { reset(); forget(); store.clear(); keysWritten.length = 0; commandCount = 0; redis = 'healthy'; jolpica = 'healthy'; });
 
 const call = async () => {
   const response = await weatherSync(new Request('https://apex.test/api/cron/weather-sync', { headers: { authorization: 'Bearer disposable-redis-secret' } }));
@@ -114,23 +119,49 @@ test('corrupted shared lastSuccessAt reads as unknown: outage → runner red', a
   }
 });
 
-for (const failure of ['down', 'slow'] as const) {
-  test(`Upstash ${failure}: Jolpica admission cannot run → provider-unavailable (jolpica-admission); red with no success in this process, green with one`, async () => {
+// Redis is optional (incident 2026-10-31): Upstash failing (the exact quota 400 that
+// broke production, auth, refused, slow, garbage) no longer blocks Jolpica reads.
+for (const failure of ['quota', 'auth', 'down', 'slow', 'garbage'] as const) {
+  test(`Upstash ${failure}: the cron still reads Jolpica (process-local admission) and answers 200; lastSuccessAt stays in process memory`, async () => {
     redis = failure;
+    const result = await call();
+    assert.equal(result.status, 200, result.text);
+    assert.equal(result.body.ok, true);
+    assert.equal((await invoke(result)).code, 0);
+    assert.doesNotMatch(result.text, /jolpica-admission/);
+  });
+
+  test(`Upstash ${failure} + Jolpica down: 503 provider jolpica (never jolpica-admission); unknown lastSuccessAt is red, a success in this process is green`, async () => {
+    redis = failure; jolpica = 'down';
     const cold = await call();
     assert.equal(cold.status, 503, cold.text);
     assert.equal(cold.body.reason, 'provider-unavailable');
-    assert.equal(cold.body.provider, 'jolpica-admission');
+    assert.equal(cold.body.provider, 'jolpica');
     assert.equal(cold.body.lastSuccessAt, null, 'the shared store cannot be read');
     assert.equal((await invoke(cold)).code, 1);
-    // The same instance succeeded earlier (process memory): a recent success is still known.
-    reset(); redis = 'healthy';
+    reset(); jolpica = 'healthy';
     assert.equal((await call()).status, 200);
-    reset(); redis = failure;
+    reset(); jolpica = 'down'; redis = failure;
     const warm = await call();
     assert.equal(warm.status, 503);
     assert.notEqual(warm.body.lastSuccessAt, null);
     const run = await invoke(warm);
-    assert.equal(run.code, 0); assert.match(run.text, /::warning::.*jolpica-admission/);
+    assert.equal(run.code, 0); assert.match(run.text, /::warning::.*jolpica/);
   });
 }
+
+/**
+ * Command budget (DEPLOY.md "Redis usage budget"): one healthy weather-sync
+ * run spends at most 4 Redis commands (admission reserve + complete, one
+ * last-good copy, the lastSuccessAt write); a second run in the same hour
+ * reuses the process copy of the calendar and only records its success.
+ */
+test('command budget: a weather-sync run costs ≤ 4 Redis commands, a repeat run ≤ 2', async () => {
+  assert.equal((await call()).status, 200);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(commandCount <= 4, `${commandCount} commands`);
+  commandCount = 0;
+  assert.equal((await call()).status, 200);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(commandCount <= 2, `${commandCount} commands on the repeat run`);
+});

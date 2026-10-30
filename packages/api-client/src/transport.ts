@@ -29,10 +29,15 @@ export class ProviderError extends Error {
  *  - configuration: credentials or settings (401/403 from the provider, bad config).
  *  - invalid-data: the provider answered with data that fails validation.
  *  - internal: anything that is not a provider failure (our own bug).
+ *  - redis-unavailable: Upstash refused or failed (quota, auth, outage); callers
+ *    degrade to process-local behaviour (redis-guard.ts).
  */
-export type ProviderFailureClass = 'provider-unavailable' | 'request-rejected' | 'configuration' | 'invalid-data' | 'internal';
+export type ProviderFailureClass = 'provider-unavailable' | 'request-rejected' | 'configuration' | 'invalid-data' | 'internal' | 'redis-unavailable';
 
 export function classifyProviderFailure(error: unknown): ProviderFailureClass {
+  // Upstash (quota, auth, outage) is optional infrastructure, never a provider outage
+  // and never fatal (redis-guard.ts). Matched by name: redis-guard imports this module.
+  if (error instanceof Error && error.name === 'RedisUnavailableError') return 'redis-unavailable';
   if (!(error instanceof ProviderError)) return 'internal';
   switch (error.code) {
     case 'timeout': case 'network': case 'rate-limit': return 'provider-unavailable';

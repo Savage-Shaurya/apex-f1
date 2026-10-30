@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ProviderError, requestJson, untrackedFetch, withProviderDeadline } from "../transport";
 import { scopedRedisKey } from "../redis-scope";
 import { isBuildPhase } from "../build-phase";
+import { guardedRedisFetch, isRedisUnavailable } from "../redis-guard";
 
 export interface JolpicaRedisConfig {
   url: string;
@@ -139,8 +140,9 @@ export function createJolpicaRedisTransport(
       {
         signal,
         // Admission EVALs are control traffic: never cached by Next and never
-        // a reason to render a page dynamically.
-        fetchImpl: options.fetch ?? untrackedFetch(),
+        // a reason to render a page dynamically. Guarded: a quota/auth/outage
+        // reply opens this process's Redis breaker (redis-guard.ts).
+        fetchImpl: guardedRedisFetch("jolpica-admission", options.fetch ?? untrackedFetch()),
         timeoutMs: options.timeoutMs ?? 2000,
         maxBytes: options.maxBytes ?? 4_100_000,
       },
@@ -259,13 +261,13 @@ export async function invalidateSharedJolpicaChampionships(
   // `finished`; an unfinished current season never touches the epochs.
   const year = new Date().getUTCFullYear();
   if (season > year || (season === year && !options.finished)) return;
-  if (!config) {
-    if (process.env.NODE_ENV === "production")
-      throw new ProviderError("jolpica", "configuration");
-    return;
-  }
+  // Redis is optional (redis-guard.ts): without it, or while it is
+  // unavailable, there is no shared epoch to advance; every process keeps its
+  // bounded local TTL (nothing reads these epochs across processes today).
+  if (!config) return;
   const execute = createJolpicaRedisTransport(config, options);
-  await withProviderDeadline(
+  try {
+    await withProviderDeadline(
     "jolpica",
     async (signal) => {
       const kinds = season >= 1958 ? ["driver", "constructor"] : ["driver"];
@@ -286,4 +288,8 @@ export async function invalidateSharedJolpicaChampionships(
     },
     { timeoutMs: 2000 },
   );
+  } catch (error) {
+    if (isRedisUnavailable(error)) return;
+    throw error;
+  }
 }

@@ -1,8 +1,7 @@
 import { pingDatabase, recentIngestionSummary } from '@apex/db';
 import { isAuthorizedCronRequest } from '@/lib/cron-auth';
-import { rateLimitShared } from '@/lib/distributed-rate-limit';
 import { rateLimit } from '@/lib/rate-limit';
-import { cachedProviderProbe, pingRedis, runHealthChecks } from '@/lib/health';
+import { cachedProviderProbe, cachedRedisProbe, runHealthChecks } from '@/lib/health';
 import { errorSummary, logEvent } from '@/lib/log';
 
 export const runtime = 'nodejs';
@@ -19,10 +18,9 @@ const NO_STORE = { 'cache-control': 'no-store, max-age=0', 'x-robots-tag': 'noin
  * are seen without opening the database.
  */
 export async function GET(request: Request) {
-  // Shared quota first; if Redis itself is the outage, fall back to the
-  // per-instance brake so the endpoint can still report that outage.
-  const shared = await rateLimitShared(request, { limit: 30, windowMs: 60_000, bucket: 'health' });
-  const limited = shared.available ? shared : rateLimit(request, { limit: 30, windowMs: 60_000, bucket: 'health' });
+  // Per-instance brake only: an uptime monitor's check must not spend a Redis
+  // command (2026-10-31: the shared quota cost one EVAL per check).
+  const limited = rateLimit(request, { limit: 30, windowMs: 60_000, bucket: 'health' });
   if (!limited.ok) {
     return Response.json({ ok: false, error: 'Too many health checks; slow down.' }, { status: 429, headers: { ...NO_STORE, 'retry-after': String(limited.retryAfter) } });
   }
@@ -30,7 +28,7 @@ export async function GET(request: Request) {
   const { httpStatus, body } = await runHealthChecks({
     env: process.env,
     database: pingDatabase,
-    redis: () => pingRedis(process.env, AbortSignal.timeout(2_500)),
+    redis: () => cachedRedisProbe(process.env),
     provider: (name) => cachedProviderProbe(name, process.env),
   });
   if (body.status !== 'ok') logEvent(body.status === 'down' ? 'error' : 'warn', 'health.check', { status: body.status, checks: body.checks });

@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { openf1, openF1FailureReason, defaultOpenF1LastGoodStore, isOpenF1LockedOut, OpenF1LiveSessionLockout, type FetchOpts, type OpenF1FailureReason, type OpenF1LastGoodStore, type OpenF1Provenance } from '@apex/api-client/openf1';
 import { ProviderError } from '../../../packages/api-client/src/transport';
-import { liveStoreConfig } from './live-shared-store';
+import { liveStoreConfig, LIVE_REQUEST_GAP_MS } from './live-shared-store';
+import { REDIS_BREAKER_MS, redisFailureOf } from '../../../packages/api-client/src/redis-guard';
+import { isBuildPhase } from '../../../packages/api-client/src/build-phase';
 import { createUpstashOpenF1ReadStore, MAX_OPENF1_CACHE_BYTES, type OpenF1ReadStore } from './openf1-read-store';
 import { createLiveSourceSnapshot, liveSourceQuery, liveSourceFreshnessMs, liveSourceRefreshAfterMs, liveSourceSnapshotRows, validateLiveSourceSnapshot, type LiveSourceEndpoint, type LiveSourceSnapshot } from './live-source-snapshot';
 
@@ -26,6 +28,37 @@ const fields: Record<string, string[]> = {
 };
 const ttl: Record<string, number> = { sessions: 30_000, drivers: 300_000, position: 30_000, intervals: 30_000, stints: 60_000, weather: 60_000, race_control: 30_000, laps: 60_000, location: 10_000 };
 const unavailable = () => new ProviderError('openf1', 'incomplete');
+/**
+ * Redis is optional (2026-10-31). Per shared store: while it is unavailable
+ * (quota, auth, outage) pages read OpenF1 directly, paced in this process at
+ * the shared gap, with the last-good fallback; and verified results are
+ * remembered in this process for exactly the shared cache's lifetime, so a
+ * warm instance answers repeat reads without any Redis command.
+ */
+interface StoreLocalState { downUntil: number; nextDirectStart: number; memo: Map<string, { value: unknown; until: number }> }
+const storeStates = new WeakMap<object, StoreLocalState>();
+const MEMO_LIMIT = 256;
+/** Pacing state of direct reads during `next build` (one per build worker). */
+const BUILD_PACING = {};
+function localState(store: object): StoreLocalState {
+  let state = storeStates.get(store);
+  if (!state) { state = { downUntil: 0, nextDirectStart: 0, memo: new Map() }; storeStates.set(store, state); }
+  return state;
+}
+function memoGet<T>(store: object, query: string, at: number): { value: T } | null {
+  const state = localState(store);
+  const hit = state.memo.get(query);
+  if (!hit) return null;
+  if (hit.until <= at) { state.memo.delete(query); return null; }
+  return { value: structuredClone(hit.value) as T };
+}
+function memoSet(store: object, query: string, value: unknown, until: number, at: number): void {
+  if (!(until > at)) return;
+  const state = localState(store);
+  state.memo.delete(query);
+  while (state.memo.size >= MEMO_LIMIT) { const oldest = state.memo.keys().next().value; if (oldest === undefined) break; state.memo.delete(oldest); }
+  state.memo.set(query, { value: structuredClone(value), until });
+}
 function canonicalDate(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))
     || new Date(value.slice(0, 10) + 'T00:00:00Z').toISOString().slice(0, 10) !== value.slice(0, 10)) throw new ProviderError('openf1', 'invalid-input');
@@ -92,6 +125,15 @@ export interface ReaderDependencies {
    * is one local server and the dev provider cache enforces OpenF1's limits.
    */
   direct?: boolean;
+  /**
+   * Remember verified results in this process for exactly the shared cache's
+   * lifetime (2026-10-31, Redis usage budget). On for the production page
+   * reader (createPageOpenF1Reader); off by default so shared-cache checks can
+   * be exercised directly.
+   */
+  processMemo?: boolean;
+  /** Direct reads paced in this process at the shared gap (used during `next build`). */
+  pacedDirect?: boolean;
 }
 
 /**
@@ -161,6 +203,25 @@ export function createOpenF1PageReader(dependencies: ReaderDependencies) {
     if (remaining <= 0 || options.signal?.aborted) return Promise.reject(unavailable());
     return invoke({ ...options, strict: true, fetchImpl: dependencies.fetch, lastGood: 'fallback', ...(dependencies.lastGoodStore !== undefined ? { lastGoodStore: dependencies.lastGoodStore } : {}), onProvenance: record, timeoutMs: Math.max(1, Math.min(options.timeoutMs ?? 6000, 6000, remaining)) });
   };
+  const remember = (store: OpenF1ReadStore, query: string, value: unknown, until: number) => { if (dependencies.processMemo) memoSet(store, query, value, until, now()); };
+  const storeDown = (store: OpenF1ReadStore) => localState(store).downUntil > now();
+  const markDown = (store: OpenF1ReadStore, error: unknown) => {
+    const redis = redisFailureOf(error);
+    if (redis) localState(store).downUntil = now() + REDIS_BREAKER_MS[redis.kind];
+  };
+  /** The shared store is unavailable: one direct read, paced per process at the shared gap. */
+  const degraded = async <T>(store: object, invoke: (options: FetchOpts) => Promise<T>, options: FetchOpts): Promise<T> => {
+    const pacing = localState(store);
+    const slot = Math.max(now(), pacing.nextDirectStart);
+    if (slot >= deadline - LAST_GOOD_RESERVE_MS || options.signal?.aborted) {
+      const stored = await lastGood(invoke, options, budgetExhausted());
+      if (stored) return stored.value;
+      throw budgetExhausted();
+    }
+    pacing.nextDirectStart = slot + LIVE_REQUEST_GAP_MS;
+    if (slot > now()) await wait(slot - now(), options.signal ?? new AbortController().signal);
+    return direct(invoke, options);
+  };
   const cleanupSource = async (store: OpenF1ReadStore, query: string, owner: string, fence: number | null, admitted: boolean) => {
     const cleanup = new AbortController().signal;
     // Both transports are bounded. Awaiting them keeps all background work in
@@ -168,12 +229,14 @@ export function createOpenF1PageReader(dependencies: ReaderDependencies) {
     await Promise.allSettled([...(admitted ? [store.complete(owner, cleanup)] : []), ...(fence !== null ? [store.release(query, owner, fence, cleanup)] : [])]);
   };
   const runSource = async <T>(endpoint: LiveSourceEndpoint, key: number | 'latest', invoke: (options: FetchOpts) => Promise<T>, options: FetchOpts = {}, refresh?: { owner: string; fence: number; claimedAt: number; budgetDeadline?: number }): Promise<T> => {
-    if (!sourceCapable() && !dependencies.store && dependencies.direct) return direct(invoke, options);
+    if (!sourceCapable() && !dependencies.store && dependencies.direct) return dependencies.pacedDirect ? degraded(BUILD_PACING, invoke, options) : direct(invoke, options);
     if (!sourceCapable()) throw new ProviderError('openf1', 'configuration');
+    if (!refresh && storeDown(dependencies.store!)) return degraded(dependencies.store!, invoke, options);
     if ((key !== 'latest' && (!Number.isSafeInteger(key) || key <= 0)) || (key === 'latest' && endpoint !== 'sessions') || options.dateGte || options.dateLte) throw new ProviderError('openf1', 'invalid-input');
     const store = dependencies.store!;
     const identity = { endpoint, sessionKey: key };
     const query = liveSourceQuery(endpoint, key);
+    if (!refresh && dependencies.processMemo) { const remembered = memoGet<T>(store, query, now()); if (remembered) return remembered.value; }
     const owner = refresh?.owner ?? dependencies.ownerId?.() ?? randomUUID();
     // A response callback starts a fresh absolute budget. It does not inherit
     // a page deadline that may already be exhausted when Next runs after.
@@ -236,7 +299,10 @@ export function createOpenF1PageReader(dependencies: ReaderDependencies) {
       for (;;) {
         const cached = await read();
         if (cached && (!refresh || now() - cached.snapshot.acquisitionStartedAt < liveSourceRefreshAfterMs(endpoint))) {
-          const refreshed = await schedule(cached.snapshot); check(); return refreshed ? refreshed.result : cached.result;
+          const refreshed = await schedule(cached.snapshot); check();
+          // Remembered only while no refresh is due, exactly the window in which schedule() returns null.
+          if (!refreshed) remember(store, query, cached.result, cached.snapshot.acquisitionStartedAt + liveSourceRefreshAfterMs(endpoint));
+          return refreshed ? refreshed.result : cached.result;
         }
         if (refresh) break;
         // A remembered live-session refusal makes the read doomed: do not spend a lock or admission on it.
@@ -267,11 +333,21 @@ export function createOpenF1PageReader(dependencies: ReaderDependencies) {
       const snapshot = await createLiveSourceSnapshot(identity, rows, { acquisitionStartedAt, acquisitionCompletedAt, coverageLower: null, coverageUpper: null }, now(), signal); check();
       const cacheLifetime = Math.floor(liveSourceFreshnessMs(endpoint) - (now() - acquisitionStartedAt));
       if (cacheLifetime < 1000) throw unavailable();
-      const saved = await store.publishSource!(query, owner, fence!, snapshot, cacheLifetime, signal); check();
+      let saved: Awaited<ReturnType<NonNullable<OpenF1ReadStore['publishSource']>>>;
+      try { saved = await store.publishSource!(query, owner, fence!, snapshot, cacheLifetime, signal); }
+      catch (error) {
+        // Verified provider rows in hand: a Redis failure only loses the shared copy.
+        if (!redisFailureOf(error)) throw error;
+        markDown(store, error); return await decode(snapshot);
+      }
+      check();
       if (!saved) throw unavailable();
       const verified = await validateLiveSourceSnapshot(saved, identity, now(), signal); check();
-      return await decode(verified);
+      const decoded = await decode(verified);
+      if (!refresh) remember(store, query, decoded, verified.acquisitionStartedAt + liveSourceRefreshAfterMs(endpoint));
+      return decoded;
     } catch (error) {
+      if (!refresh && !admitted && redisFailureOf(error) && !options.signal?.aborted) { markDown(store, error); return degraded(store, invoke, options); }
       const failure = error instanceof ProviderError ? error : unavailable();
       if (!refresh) {
         const stored = await lastGood(invoke, options, fallbackReason(failure, options, sourceDeadline));
@@ -284,13 +360,15 @@ export function createOpenF1PageReader(dependencies: ReaderDependencies) {
     }
   };
   const run = async <T>(endpoint: string, params: Record<string, string | number>, invoke: (options: FetchOpts) => Promise<T>, options: FetchOpts = {}): Promise<T> => {
-    if (!dependencies.store && dependencies.direct) return direct(invoke, options);
+    if (!dependencies.store && dependencies.direct) return dependencies.pacedDirect ? degraded(BUILD_PACING, invoke, options) : direct(invoke, options);
     if (!dependencies.store) throw new ProviderError('openf1', 'configuration');
     const store = dependencies.store;
+    if (storeDown(store)) return degraded(store, invoke, options);
     for (const value of Object.values(params)) if (typeof value === 'number' && (!Number.isSafeInteger(value) || value <= 0)) throw new ProviderError('openf1', 'invalid-input');
     const canonical = { ...options, dateGte: options.dateGte ? canonicalDate(options.dateGte) : undefined, dateLte: options.dateLte ? canonicalDate(options.dateLte) : undefined };
     if (canonical.dateGte && canonical.dateLte && Date.parse(canonical.dateGte) >= Date.parse(canonical.dateLte)) throw new ProviderError('openf1', 'invalid-input');
     const query = createHash('sha256').update(JSON.stringify([endpoint, Object.entries(params).sort(), canonical.dateGte ?? null, canonical.dateLte ?? null])).digest('hex');
+    const remembered = dependencies.processMemo ? memoGet<T>(store, query, now()) : null; if (remembered) return remembered.value;
     const owner = dependencies.ownerId?.() ?? randomUUID();
     const remaining = deadline - now(); if (remaining <= 0 || options.signal?.aborted) throw unavailable();
     const controller = new AbortController(); const abort = () => controller.abort();
@@ -317,7 +395,7 @@ export function createOpenF1PageReader(dependencies: ReaderDependencies) {
       const entire = await invoke({ ...providerOptions(), maxBytes: MAX_OPENF1_CACHE_BYTES, fetchImpl: async () => Response.json(cached.rows) });
       check();
       const result = await invoke({ ...providerOptions(), maxBytes: MAX_OPENF1_CACHE_BYTES, fetchImpl: async () => Response.json(cacheRows(endpoint, entire, now())) });
-      check(); return { result };
+      check(); remember(store, query, result, cached.writtenAt + ttl[endpoint]!); return { result };
     };
     try {
       let followerDelay = 150;
@@ -349,10 +427,19 @@ export function createOpenF1PageReader(dependencies: ReaderDependencies) {
       const rows = cacheRows(endpoint, result, now());
       // Cache sanitization itself must still satisfy the endpoint schema/identity.
       const verified = await invoke({ ...providerOptions(), fetchImpl: async () => Response.json(rows) }); check();
-      const saved = await store.publish(query, owner, fence!, rows, ttl[endpoint]!, signal); check();
+      let saved: Awaited<ReturnType<OpenF1ReadStore['publish']>>;
+      try { saved = await store.publish(query, owner, fence!, rows, ttl[endpoint]!, signal); }
+      catch (error) {
+        // The provider answered and the rows are verified: a Redis failure here only loses the shared copy.
+        if (!redisFailureOf(error)) throw error;
+        markDown(store, error); return verified;
+      }
+      check();
       if (!saved) throw unavailable();
+      remember(store, query, verified, now() + ttl[endpoint]!);
       return verified;
     } catch (error) {
+      if (!admitted && redisFailureOf(error) && !options.signal?.aborted) { markDown(store, error); return degraded(store, invoke, canonical); }
       const failure = error instanceof ProviderError ? error : unavailable();
       const stored = await lastGood(invoke, canonical, fallbackReason(failure, options, deadline));
       if (stored) return stored.value;
@@ -393,11 +480,15 @@ export function createOpenF1PageReader(dependencies: ReaderDependencies) {
 }
 let configured: { identity: string; store: OpenF1ReadStore } | null = null;
 export function createPageOpenF1Reader(options: Pick<ReaderDependencies, 'scheduleRefresh'> = {}) {
+  // `next build` never uses the shared store (2026-10-31): build workers polling its locks
+  // cost about 13,000 Redis commands per build. Each worker reads OpenF1 directly, paced
+  // at the shared gap, through Next's fetch cache, with the in-memory last-good fallback.
+  if (isBuildPhase()) return createOpenF1PageReader({ store: null, direct: true, pacedDirect: true });
   const config = liveStoreConfig();
   if (!config) return createOpenF1PageReader({ store: null, direct: process.env.NODE_ENV !== 'production' });
   // Store transport is reused for private causal ordering. Credentials never
   // become public cache identities, errors, rows or logs.
   const identity = createHash('sha256').update(config.url + ':' + config.token).digest('hex');
   if (!configured || configured.identity !== identity) configured = { identity, store: createUpstashOpenF1ReadStore(config) };
-  return createOpenF1PageReader({ store: configured.store, scheduleRefresh: options.scheduleRefresh });
+  return createOpenF1PageReader({ store: configured.store, scheduleRefresh: options.scheduleRefresh, processMemo: true });
 }

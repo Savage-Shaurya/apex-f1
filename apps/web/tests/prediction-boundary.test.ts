@@ -91,8 +91,9 @@ test('prediction times out and cancels an unfinished upload before canonical pro
     cancel() { cancelled = true; },
   });
   const pending = POST(request({}, body));
-  // The quota fixture settles before the upload parser starts its deadline.
-  for (let index = 0; index < 12; index++) await Promise.resolve();
+  // The quota fixture settles before the upload parser starts its deadline
+  // (the Redis guard reads and re-wraps the reply: a few more microtasks).
+  for (let index = 0; index < 60; index++) await Promise.resolve();
   t.mock.timers.tick(5_000);
   const response = await pending;
   assert.equal(response.status, 408);
