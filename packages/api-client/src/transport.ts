@@ -2,7 +2,7 @@
 export class ProviderError extends Error {
   constructor(
     readonly provider: string,
-    readonly code: 'http' | 'timeout' | 'network' | 'invalid-response' | 'configuration' | 'incomplete' | 'invalid-input' | 'rate-limit',
+    readonly code: 'http' | 'timeout' | 'network' | 'invalid-response' | 'configuration' | 'incomplete' | 'invalid-input' | 'rate-limit' | 'redirect',
     readonly status?: number,
     /** Server-requested wait (HTTP Retry-After), when the provider sent one. */
     readonly retryAfterMs?: number,
@@ -37,7 +37,8 @@ export function classifyProviderFailure(error: unknown): ProviderFailureClass {
   switch (error.code) {
     case 'timeout': case 'network': case 'rate-limit': return 'provider-unavailable';
     case 'configuration': return 'configuration';
-    case 'invalid-input': return 'request-rejected';
+    // A permanent move (301/308 under redirect:'error') is ours to follow up, never an outage (review F-01).
+    case 'invalid-input': case 'redirect': return 'request-rejected';
     case 'invalid-response': case 'incomplete': return 'invalid-data';
     case 'http': {
       const status = error.status ?? 0;
@@ -64,26 +65,29 @@ function quotaReason(parsed: Record<string, unknown>): boolean {
   return error.errors.some((entry) => isRecord(entry) && typeof entry.reason === 'string' && QUOTA_REASONS.has(entry.reason));
 }
 
+/** Longest wait for the one body read a failed response can need: a JSON 403 that may be a quota reply. */
+export const QUOTA_PEEK_MS = 250;
+
 /**
- * Peek (bounded: 4 KB, 1 s) at a failed response's body: the provider's own
- * JSON object means it rejected our request; HTML, text, an empty body or a
- * stalled read means a CDN/edge answered instead. The body is never kept.
+ * Who answered a failed request, from the content type alone (review F-04):
+ * JSON is the provider's own answer (our request was refused), anything else
+ * (HTML, text, no type) is a CDN/edge page. No body is read for that, so a
+ * failed read adds no latency to page renders (review F-06). Only a JSON 403
+ * is peeked at (4 KB, 250 ms) for a quota reason; the body is never kept.
  */
 async function failureOrigin(response: Response, signal: AbortSignal): Promise<{ origin: 'provider' | 'edge'; quota: boolean }> {
-  if (!/^application\/(?:[a-z0-9.+-]+\+)?json\b/i.test(response.headers.get('content-type') ?? '')) {
+  const json = /^application\/(?:[a-z0-9.+-]+\+)?json\b/i.test(response.headers.get('content-type') ?? '');
+  if (!json || response.status !== 403) {
     void response.body?.cancel().catch(() => undefined);
-    return { origin: 'edge', quota: false };
+    return { origin: json ? 'provider' : 'edge', quota: false };
   }
   const timer = new AbortController();
-  const stop = setTimeout(() => timer.abort(), 1_000);
+  const stop = setTimeout(() => timer.abort(), QUOTA_PEEK_MS);
   try {
-    const text = await readLimitedText(response, 4_096, AbortSignal.any([signal, timer.signal]));
-    const parsed = JSON.parse(text) as unknown;
-    // Any JSON object (even {}) under a JSON content type is the provider's own answer; edges send pages.
-    if (!isRecord(parsed)) return { origin: 'edge', quota: false };
-    return { origin: 'provider', quota: quotaReason(parsed) };
+    const parsed = JSON.parse(await readLimitedText(response, 4_096, AbortSignal.any([signal, timer.signal]))) as unknown;
+    return { origin: 'provider', quota: isRecord(parsed) && quotaReason(parsed) };
   } catch {
-    return { origin: 'edge', quota: false };
+    return { origin: 'provider', quota: false };
   } finally {
     clearTimeout(stop);
   }
@@ -212,13 +216,45 @@ export async function withProviderDeadline<T>(
   try {
     return await Promise.race([operation(controller.signal), interrupted]);
   } catch (error) {
-    if (isFrameworkControlError(error)) throw error;
-    throw error instanceof ProviderError ? error : new ProviderError(provider, 'network');
+    if (isFrameworkControlError(error) || error instanceof ProviderError) throw error;
+    // Only a real transport failure becomes a provider error; anything else is our own
+    // bug and is rethrown unchanged (classified 'internal', red) (review F-01).
+    throw transportFailure(provider, error) ?? error;
   } finally {
     clearTimeout(timer);
     if (onAbort) options.signal?.removeEventListener('abort', onAbort);
     controller.abort();
   }
+}
+
+/** Socket-level failures that mean "the other side is unreachable right now". */
+const NETWORK_FAILURE_CODES = new Set([
+  'ECONNRESET', 'ECONNREFUSED', 'ECONNABORTED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'ENETDOWN', 'EPIPE',
+  'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT', 'UND_ERR_SOCKET', 'UND_ERR_CLOSED',
+]);
+/** TLS and certificate failures: a configuration problem on one side, never a passing outage. */
+const TLS_FAILURE_CODE = /^(?:CERT_|UNABLE_TO_(?:GET|VERIFY|DECRYPT)|DEPTH_ZERO_SELF_SIGNED_CERT|SELF_SIGNED_CERT_IN_CHAIN|ERR_TLS_|ERR_SSL_|ERR_OSSL_|HOSTNAME_MISMATCH)/;
+
+/**
+ * Map a thrown fetch error to a provider failure, or null when it is not a
+ * transport failure at all (review F-01): an abort/timeout or a socket error
+ * (DNS, reset, refused, closed) is 'timeout'/'network'; a refused redirect
+ * (undici "unexpected redirect" under redirect:'error') is 'redirect'; a TLS
+ * or certificate error is 'configuration'. Follows up to four `cause` links.
+ */
+function transportFailure(provider: string, error: unknown): ProviderError | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth++) {
+    const record = current as { name?: unknown; code?: unknown; message?: unknown; cause?: unknown };
+    if (record.name === 'AbortError' || record.name === 'TimeoutError') return new ProviderError(provider, 'timeout');
+    if (typeof record.code === 'string') {
+      if (TLS_FAILURE_CODE.test(record.code)) return new ProviderError(provider, 'configuration');
+      if (NETWORK_FAILURE_CODES.has(record.code)) return new ProviderError(provider, 'network');
+    }
+    if (depth > 0 && typeof record.message === 'string' && /^(?:unexpected redirect|redirect count exceeded)$/i.test(record.message)) return new ProviderError(provider, 'redirect');
+    current = record.cause;
+  }
+  return null;
 }
 
 export async function requestJson<T = unknown>(

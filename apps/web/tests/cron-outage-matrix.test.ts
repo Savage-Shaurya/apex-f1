@@ -84,12 +84,13 @@ const youtubeHealthy = (url: URL): Response => {
 
 // ---------- fault injection ----------
 const OUTAGE_MODES = ['connect-timeout', 'connection-reset', 'dns-failure', 'edge-400-html', 'edge-403-html', '429-retry-after', '429', '500', '502', '503', '504'] as const;
-const BUG_MODES = ['own-400-json', '401', '404-json', '404-html', 'empty-200', 'truncated-body', 'wrong-schema', 'partial-pages'] as const;
+const BUG_MODES = ['own-400-json', '401', '404-json', '404-html', 'empty-200', 'truncated-body', 'wrong-schema', 'partial-pages', '301-moved', 'tls-certificate', 'our-typeerror'] as const;
 const SUCCESS_MODES = ['healthy', 'slow-then-success'] as const;
 type Mode = (typeof OUTAGE_MODES)[number] | (typeof BUG_MODES)[number] | (typeof SUCCESS_MODES)[number] | 'response-timeout';
 
 const networkError = (code: string) => Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error(code), { code }) });
-async function fault(mode: Mode, provider: Target['provider'], signal: AbortSignal | null | undefined, healthy: () => Response): Promise<Response> {
+async function fault(mode: Mode, provider: Target['provider'], init: RequestInit | undefined, healthy: () => Response): Promise<Response> {
+  const signal = init?.signal;
   const html = (status: number) => new Response(`<html><head><title>${status}</title></head><body><center>cloudflare</center></body></html>`, { status, headers: { 'content-type': 'text/html' } });
   switch (mode) {
     case 'healthy': return healthy();
@@ -111,6 +112,14 @@ async function fault(mode: Mode, provider: Target['provider'], signal: AbortSign
     case 'empty-200': return new Response('', { status: 200, headers: { 'content-type': provider === 'rss' ? 'application/rss+xml' : 'application/json' } });
     case 'truncated-body': return new Response(provider === 'rss' ? '<?xml version="1.0"?><rss version="2.0"><channel><item><title>Cut' : '{"MRData":{"total":"2', { headers: { 'content-type': 'application/json' } });
     case 'wrong-schema': return Response.json({ hello: 'world' });
+    // Review F-01: a permanent move. undici rejects it under redirect:'error' (Jolpica, Open-Meteo,
+    // YouTube); RSS follows redirects, so a 301 that reaches us is a plain response.
+    case '301-moved':
+      if (init?.redirect === 'error') throw Object.assign(new TypeError('fetch failed'), { cause: new Error('unexpected redirect') });
+      return new Response('', { status: 301, headers: { location: 'https://moved.invalid/' } });
+    case 'tls-certificate': throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('certificate has expired'), { code: 'CERT_HAS_EXPIRED' }) });
+    // Our own bug on the request path (not a transport failure).
+    case 'our-typeerror': throw new TypeError("Cannot read properties of undefined (reading 'items')");
     case 'partial-pages': {
       // Jolpica-shaped page that declares more rows than it carries (pagination total mismatch).
       const page = await healthy().json() as { MRData: Record<string, unknown> };
@@ -182,7 +191,7 @@ before(async () => {
     providerCalls.push(url.hostname);
     const healthy = () => (isJolpica(url) ? jolpicaHealthy(url) : url.hostname.endsWith('open-meteo.com') ? openMeteoHealthy(url) : url.hostname === 'www.googleapis.com' ? youtubeHealthy(url) : rssHealthy());
     if (!current.faulted(url)) return healthy();
-    return fault(mode, current.provider, init?.signal, healthy);
+    return fault(mode, current.provider, init, healthy);
   }) as typeof fetch;
 });
 after(() => {

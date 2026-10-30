@@ -33,7 +33,10 @@ const HOUR_MS = 3_600_000;
  */
 export const STALE_AFTER_HOURS = {
   "weather-sync": 48,
-  "weekend-watch": 48,
+  // Runs Friday 00:04 to Monday 06:54 UTC only: the Monday-to-Friday gap is 89 h, so 48 h
+  // would turn the first failing Friday run red after a healthy weekend (review F-05).
+  // scripts/cron-coverage.test.mjs checks every limit is at least the schedule gap + 24 h.
+  "weekend-watch": 120,
   "jolpica-nightly": 72,
   "rss-sync": 48,
   "youtube-sync": 48,
@@ -143,12 +146,14 @@ function outageFrom(report, route, now) {
     typeof report.provider === "string" && /^[a-z0-9-]{1,32}$/.test(report.provider)
       ? report.provider
       : "unknown provider";
-  let lastSuccessAt = null;
-  if (typeof report.lastSuccessAt === "string" && ISO_INSTANT.test(report.lastSuccessAt)) {
-    const at = Date.parse(report.lastSuccessAt);
-    if (Number.isFinite(at) && at <= now + FUTURE_TOLERANCE_MS) lastSuccessAt = at;
-  }
-  return new ProviderUnavailableError(route, provider, lastSuccessAt);
+  return new ProviderUnavailableError(route, provider, instantFrom(report.lastSuccessAt, now));
+}
+
+/** A valid ISO instant not further than the clock-skew allowance in the future, else null. */
+function instantFrom(value, now) {
+  if (typeof value !== "string" || !ISO_INSTANT.test(value)) return null;
+  const at = Date.parse(value);
+  return Number.isFinite(at) && at <= now + FUTURE_TOLERANCE_MS ? at : null;
 }
 
 /**
@@ -244,6 +249,8 @@ export async function invokeCron({
           route,
           degraded:
             report.degraded === true || report.results?.degraded === true,
+          // The last FULL success, stamped on degraded reports (review F-02).
+          lastSuccessAt: instantFrom(report.lastSuccessAt, now()),
           // jolpica-nightly: deferred rounds remain for the next run (not a failure).
           continuation: report.continuation === true,
           durationMs:
@@ -352,8 +359,21 @@ export async function runCronCommand(
         `[cron] ${result.route} -> HTTP 200; report ok${result.durationMs === null ? "" : `; duration ${result.durationMs}ms`}${runs > 1 ? `; run ${run} of at most ${runs}` : ""}`,
       );
       if (result.degraded) {
+        // A degraded run (last-good calendar, some sources down) is not a full success:
+        // green with a warning only while the last FULL success is recent (review F-02).
+        const limitHours = STALE_AFTER_HOURS[route] ?? 48;
+        const last = result.lastSuccessAt;
+        const ageHours = last === null ? null : Math.max(0, now() - last) / HOUR_MS;
+        if (ageHours === null || ageHours > limitHours) {
+          const message = last === null
+            ? `${result.route}: completed degraded (fallback data) and no full success on record; failing so a prolonged breakage is noticed.`
+            : `${result.route}: completed degraded (fallback data); last full success ${new Date(last).toISOString()} is ${ageHours.toFixed(1)} h old, over the ${limitHours} h limit.`;
+          errorLog(`::error::${message}`);
+          appendSummary(`- ❌ ${message} The run failed.`);
+          return 1;
+        }
         log(
-          `::warning::${result.route} completed with degraded provider availability.`,
+          `::warning::${result.route} completed with degraded provider availability (last full success ${ageHours.toFixed(1)} h ago).`,
         );
         appendSummary(`- ⚠️ \`${result.route}\` completed with degraded provider availability (for example, it used the last validated calendar).`);
       }

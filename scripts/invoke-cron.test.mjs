@@ -34,6 +34,7 @@ test("cron caller authenticates one request, refuses redirects and validates its
     degraded: false,
     continuation: false,
     durationMs: 12,
+    lastSuccessAt: null,
   });
 });
 
@@ -186,6 +187,7 @@ test("degraded success emits a warning but never prints response fields or trans
         ok: true,
         route: "rss-sync",
         degraded: true,
+        lastSuccessAt: new Date(Date.now() - 3_600_000).toISOString(),
         durationMs: 20,
         error: configuration.secret,
         sources: ["https://private.invalid?apiKey=private"],
@@ -371,7 +373,7 @@ test("provider outage that clears on a retry is a plain success", async () => {
 
 test("provider outage with a stale or unknown last success fails red (48 h weather/weekend, 72 h season)", async () => {
   for (const [route, hoursAgo, expected] of [
-    ["weather-sync", 49, 1], ["weekend-watch", 49, 1], ["weekend-watch", 47, 0],
+    ["weather-sync", 49, 1], ["weekend-watch", 121, 1], ["weekend-watch", 119, 0],
     ["jolpica-nightly", 60, 0], ["jolpica-nightly", 73, 1],
     ["weather-sync", null, 1],
   ]) {
@@ -454,7 +456,7 @@ test("a loopback http origin is accepted for local checks; any other http origin
 test("staleness threshold edges: 47 h 59 vs 48 h 01 (weather/weekend), 71 h 59 vs 72 h 01 (season)", async () => {
   for (const [route, hours, expected] of [
     ["weather-sync", 47 + 59 / 60, 0], ["weather-sync", 48 + 1 / 60, 1],
-    ["weekend-watch", 47 + 59 / 60, 0], ["weekend-watch", 48 + 1 / 60, 1],
+    ["weekend-watch", 119 + 59 / 60, 0], ["weekend-watch", 120 + 1 / 60, 1],
     ["rss-sync", 48 + 1 / 60, 1], ["youtube-sync", 47 + 59 / 60, 0],
     ["jolpica-nightly", 71 + 59 / 60, 0], ["jolpica-nightly", 72 + 1 / 60, 1],
   ]) {
@@ -532,4 +534,25 @@ test("fake clock: worst-case retries and continuations end inside every refresh 
       assert.ok(elapsed + SETUP_MS <= timeoutMs, `${file} ${scenario}: ${elapsed} ms + setup exceeds ${timeoutMs} ms`);
     }
   }
+});
+
+test("review F-02: a degraded 200 warns only while the last FULL success is recent; stale or unknown is red", async () => {
+  const degraded = (route, lastSuccessAt) => Response.json({ ok: true, route, degraded: true, lastSuccessAt });
+  for (const [route, hours, expected] of [["weather-sync", 5, 0], ["weather-sync", 49, 1], ["weather-sync", null, 1], ["jolpica-nightly", 71, 0], ["rss-sync", 60, 1]]) {
+    const run = harness([degraded(route, hours === null ? null : new Date(NOW - hours * HOUR).toISOString())]);
+    assert.equal(await runCronCommand([route], cronEnv, run.options), expected, `${route} ${hours}`);
+    assert.equal(run.calls(), 1, "a degraded 200 is never retried");
+    assert.match(run.output.join("\n"), expected === 0 ? /::warning::/ : /::error::.*(no full success|last full success)/);
+  }
+  // A plain (not degraded) 200 needs no lastSuccessAt.
+  assert.equal(await runCronCommand(["weather-sync"], cronEnv, harness([Response.json({ ok: true, route: "weather-sync" })]).options), 0);
+});
+
+test("review F-05: weekend-watch tolerates its Monday-to-Friday gap (120 h); the others keep 48/72 h", async () => {
+  const { STALE_AFTER_HOURS } = await import("./invoke-cron.mjs");
+  assert.equal(STALE_AFTER_HOURS["weekend-watch"], 120);
+  // Monday 06:54 success, Friday 00:04 first run with Jolpica down: 89 h later is still a warning.
+  const run = harness([outageReport("weekend-watch", new Date(NOW - 89 * HOUR).toISOString())]);
+  assert.equal(await runCronCommand(["weekend-watch"], cronEnv, run.options), 0);
+  assert.equal(await runCronCommand(["weekend-watch"], cronEnv, harness([outageReport("weekend-watch", new Date(NOW - 121 * HOUR).toISOString())]).options), 1);
 });

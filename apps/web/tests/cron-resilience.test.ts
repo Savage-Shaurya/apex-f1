@@ -54,7 +54,7 @@ test('weather-sync: an unavailable Jolpica falls back to the last validated cale
 });
 
 test('weather-sync: no calendar at all during an outage is a retryable provider-unavailable report with lastSuccessAt', async () => {
-  jolpica.getSchedule = lastGoodCalendar([fixtureRace(Date.now() + 40 * DAY)]);
+  jolpica.getSchedule = (async () => [fixtureRace(Date.now() + 40 * DAY)]) as Schedule;
   assert.equal((await weatherSync(request('weather-sync'))).status, 200);
   for (const error of [new ProviderError('jolpica', 'timeout'), new ProviderError('jolpica', 'http', 429), new ProviderError('jolpica', 'http', 400, undefined, 'edge')]) {
     jolpica.getSchedule = failingCalendar(error);
@@ -135,15 +135,21 @@ test('weekend-watch: an unreadable calendar with no copy is provider-unavailable
 });
 
 test('finalizeCronResponse records only a successful report for its own route and stamps lastSuccessAt on outages', async () => {
-  const written: Array<[string, number]> = [];
+  const written: Array<[string, number, string]> = [];
   let stored: number | null = Date.parse('2026-10-30T12:00:00Z');
-  const store: CronStatusStore = { read: async () => stored, write: async (route, at) => { written.push([route, at]); } };
+  const store: CronStatusStore = { read: async () => stored, write: async (route, at, kind = 'success') => { written.push([route, at, kind]); } };
   await finalizeCronResponse('weather-sync', Response.json({ ok: false, route: 'weather-sync' }, { status: 500 }), store);
   await finalizeCronResponse('weather-sync', Response.json({ ok: true, route: 'rss-sync' }), store);
   assert.equal(written.length, 0);
-  const ok = await finalizeCronResponse('weather-sync', Response.json({ ok: true, route: 'weather-sync', degraded: true }), store);
+  // Review F-02: a degraded run (last-good calendar, some sources down) is NOT a success for the
+  // staleness alarm. It is recorded separately and carries the last FULL success for the runner.
+  const degraded = await finalizeCronResponse('weather-sync', Response.json({ ok: true, route: 'weather-sync', degraded: true }), store);
+  assert.equal(degraded.status, 200);
+  assert.deepEqual(written.map(([, , kind]) => kind), ['degraded']);
+  assert.equal((await degraded.json()).lastSuccessAt, '2026-10-30T12:00:00.000Z');
+  const ok = await finalizeCronResponse('weather-sync', Response.json({ ok: true, route: 'weather-sync' }), store);
   assert.equal(ok.status, 200);
-  assert.equal(written.length, 1);
+  assert.deepEqual(written.map(([, , kind]) => kind), ['degraded', 'success']);
   const outage = await finalizeCronResponse('weather-sync', Response.json({ ok: false, route: 'weather-sync', retryable: true, reason: PROVIDER_UNAVAILABLE }, { status: 503, headers: { 'retry-after': '120', 'cache-control': 'no-store' } }), store);
   assert.equal(outage.status, 503);
   assert.equal(outage.headers.get('retry-after'), '120');
@@ -151,4 +157,22 @@ test('finalizeCronResponse records only a successful report for its own route an
   stored = null;
   const unknown = await finalizeCronResponse('weather-sync', Response.json({ ok: false, route: 'weather-sync', retryable: true, reason: PROVIDER_UNAVAILABLE }, { status: 503 }), { ...store, read: async () => { throw new Error('redis down'); } });
   assert.equal((await unknown.json()).lastSuccessAt, null);
+});
+
+test('review F-02: runs on a last-good calendar never refresh lastSuccessAt, so the stale alarm keeps counting', async () => {
+  jolpica.getSchedule = failingCalendar(new ProviderError('jolpica', 'timeout'));
+  // Days of degraded runs on the last-good calendar...
+  jolpica.getSchedule = lastGoodCalendar([fixtureRace(Date.now() + 40 * DAY)]);
+  for (let run = 0; run < 3; run++) {
+    const response = await weatherSync(request('weather-sync'));
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.degraded, true);
+    assert.equal(body.lastSuccessAt, null, 'no full success on record: the runner must go red, not warn');
+  }
+  // ...then the copy is gone: the outage report still has no full success on record.
+  jolpica.getSchedule = failingCalendar(new ProviderError('jolpica', 'timeout'));
+  const outage = await (await weatherSync(request('weather-sync'))).json();
+  assert.equal(outage.lastSuccessAt, null);
+  assert.ok(Date.now() - Date.parse(outage.lastDegradedAt) < 60_000, 'the degraded runs are recorded separately');
 });

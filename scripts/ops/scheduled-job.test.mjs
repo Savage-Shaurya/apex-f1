@@ -18,7 +18,11 @@ function github(hoursAgo, { markerConclusion = 'success', status = 200 } = {}) {
     calls.push(String(url));
     assert.equal(init.headers.Authorization, 'Bearer synthetic-token');
     if (status !== 200) return new Response('{}', { status });
-    if (/\/actions\/workflows\/db-backup\.yml\/runs\?status=success/.test(url)) return Response.json({ workflow_runs: hoursAgo === null ? [] : [{ id: 41 }] });
+    if (new URL(url).pathname === '/repos/owner/apex-f1') return Response.json({ default_branch: 'main' });
+    if (/\/actions\/workflows\/db-backup\.yml\/runs\?status=success/.test(url)) {
+      const event = new URL(url).searchParams.get('event');
+      return Response.json({ workflow_runs: hoursAgo === null || event !== 'schedule' ? [] : [{ id: 41, event: 'schedule', head_branch: 'main', head_repository: { full_name: 'owner/apex-f1' }, path: '.github/workflows/db-backup.yml' }] });
+    }
     if (/\/actions\/runs\/41\/jobs/.test(url)) return Response.json({ jobs: [{ steps: [{ name: 'Back up database to private Supabase Storage', conclusion: 'success', completed_at: new Date(NOW - hoursAgo * HOUR).toISOString() }, { name: SUCCESS_MARKER_STEP, conclusion: markerConclusion, completed_at: new Date(NOW - hoursAgo * HOUR).toISOString() }] }] });
     return new Response('{}', { status: 404 });
   };
@@ -117,7 +121,7 @@ test('malformed arguments fail red before running anything', async () => {
 test('lastVerifiedSuccess only trusts the marker step of this workflow', async () => {
   const gh = github(3);
   assert.equal(await lastVerifiedSuccess(githubEnv, gh.fetchImpl), NOW - 3 * HOUR);
-  assert.ok(gh.calls.every((url) => url.startsWith('https://api.github.com/repos/owner/apex-f1/')));
+  assert.ok(gh.calls.every((url) => /^https:\/\/api\.github\.com\/repos\/owner\/apex-f1(?:\/|$)/.test(url)), gh.calls.join(' '));
   assert.equal(await lastVerifiedSuccess({ ...githubEnv, GITHUB_WORKFLOW_REF: 'garbage' }, gh.fetchImpl), null);
   assert.equal(await lastVerifiedSuccess(githubEnv, async () => { throw new TypeError('fetch failed'); }), null);
 });
@@ -172,4 +176,59 @@ test('dependency audit: a registry outage is reported apart from an audit failur
     const broken = await runDependencyAudit({ root, cli: '/x/pnpm.cjs', command: commands({ code: 1, stdout: 'not json', stderr: '' }) });
     assert.equal(broken.ready, false); assert.equal(broken.registryUnavailable, undefined);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+// ---------- Independent review 2026-10-31 (docs/audit/2026-10-31/cron-review.md) ----------
+import { runCommand } from './scheduled-job.mjs';
+
+/** Fake GitHub API for F-03: the runs listing honours branch/event filters like the real one. */
+function githubRuns(runs, { defaultBranch = 'main' } = {}) {
+  const queries = [];
+  const fetchImpl = async (url) => {
+    const parsed = new URL(url);
+    if (parsed.pathname === '/repos/owner/apex-f1') return Response.json({ default_branch: defaultBranch });
+    if (/\/actions\/workflows\/db-backup\.yml\/runs$/.test(parsed.pathname)) {
+      queries.push(parsed.search);
+      const branch = parsed.searchParams.get('branch'), event = parsed.searchParams.get('event');
+      return Response.json({ workflow_runs: runs.filter((run) => (!branch || run.head_branch === branch) && (!event || run.event === event)) });
+    }
+    const jobs = /\/actions\/runs\/(\d+)\/jobs/.exec(parsed.pathname);
+    if (jobs) {
+      const run = runs.find((item) => item.id === Number(jobs[1]));
+      return Response.json({ jobs: [{ steps: [{ name: SUCCESS_MARKER_STEP, conclusion: 'success', completed_at: run.completed }] }] });
+    }
+    return new Response('{}', { status: 404 });
+  };
+  return { fetchImpl, queries };
+}
+const legit = { id: 7, event: 'schedule', head_branch: 'main', head_repository: { full_name: 'owner/apex-f1' }, path: '.github/workflows/db-backup.yml', completed: new Date(NOW - 3 * HOUR).toISOString() };
+
+test('review F-03 E4: a fork pull_request run, another branch or another workflow file never counts as a verified success', async () => {
+  for (const planted of [
+    { ...legit, id: 8, event: 'pull_request', head_branch: 'attacker', head_repository: { full_name: 'evil/r' } },
+    { ...legit, id: 9, event: 'pull_request', head_branch: 'main', head_repository: { full_name: 'evil/r' } },
+    { ...legit, id: 10, event: 'push', head_branch: 'main' },
+    { ...legit, id: 11, event: 'workflow_dispatch', head_branch: 'feature' },
+    { ...legit, id: 12, event: 'schedule', head_branch: 'main', head_repository: { full_name: 'evil/r' } },
+    { ...legit, id: 13, event: 'schedule', path: '.github/workflows/copy.yml' },
+  ]) {
+    const gh = githubRuns([planted]);
+    assert.equal(await lastVerifiedSuccess(githubEnv, gh.fetchImpl), null, JSON.stringify(planted));
+  }
+  for (const event of ['schedule', 'workflow_dispatch']) {
+    const gh = githubRuns([{ ...legit, event }]);
+    assert.equal(await lastVerifiedSuccess(githubEnv, gh.fetchImpl), NOW - 3 * HOUR, event);
+    assert.ok(gh.queries.every((query) => /branch=main/.test(query) && /event=(?:schedule|workflow_dispatch)/.test(query)), gh.queries.join(' '));
+  }
+  // The newest verified run wins across both events.
+  const both = githubRuns([{ ...legit, id: 20, completed: new Date(NOW - 30 * HOUR).toISOString() }, { ...legit, id: 21, event: 'workflow_dispatch', completed: new Date(NOW - 2 * HOUR).toISOString() }]);
+  assert.equal(await lastVerifiedSuccess(githubEnv, both.fetchImpl), NOW - 2 * HOUR);
+});
+
+test('review F-07: the wrapped command never receives GITHUB_TOKEN', async () => {
+  const quiet = { write: () => true };
+  const result = await runCommand([process.execPath, '-e', 'process.stdout.write(process.env.GITHUB_TOKEN ? "token-present" : "token-absent")'], { env: { ...process.env, GITHUB_TOKEN: 'synthetic-token' }, stdout: quiet, stderr: quiet });
+  assert.equal(result.code, 0);
+  assert.match(result.output, /token-absent/);
+  assert.doesNotMatch(result.output, /synthetic-token/);
 });

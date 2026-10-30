@@ -1,3 +1,5 @@
+import http from 'node:http';
+import { withProviderDeadline } from './transport';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ProviderError, classifyProviderFailure, isProviderUnavailable, requestJson } from './transport';
@@ -84,4 +86,81 @@ test("YouTube's quota reply (403 quotaExceeded / rateLimitExceeded) is a rate li
   // A 404 is never an outage, even when an edge answered it: the path is ours.
   assert.equal(classifyProviderFailure(await failureOf(respond('<html>404</html>', 404, 'text/html'))), 'request-rejected');
   assert.equal(classifyProviderFailure(await failureOf(respond('<html>401</html>', 401, 'text/html'))), 'configuration');
+});
+
+// ---------- Independent review 2026-10-31 (docs/audit/2026-10-31/cron-review.md) ----------
+
+async function localServer(handler: http.RequestListener) {
+  const server = http.createServer(handler);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const { port } = server.address() as { port: number };
+  return { url: (path: string) => `http://127.0.0.1:${port}${path}`, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+}
+const undiciFailure = (cause: Error) => Object.assign(new TypeError('fetch failed'), { cause });
+
+test('review F-01 E1: our own TypeError inside a provider deadline is our bug (internal), not an outage', async () => {
+  const error = await withProviderDeadline('rss', async () => { (undefined as unknown as { items: unknown[] }).items.map(String); }).then(() => assert.fail('must throw'), (failure: unknown) => failure);
+  assert.ok(error instanceof TypeError, 'rethrown unchanged');
+  assert.equal(classifyProviderFailure(error), 'internal');
+  assert.equal(isProviderUnavailable(error), false);
+  for (const bug of [new ReferenceError('x is not defined'), new RangeError('bad'), Object.assign(new Error('assertion'), { code: 'ERR_ASSERTION' }), new TypeError('fetch failed')])
+    assert.equal(isProviderUnavailable(await withProviderDeadline('jolpica', async () => { throw bug; }).catch((failure: unknown) => failure)), false, bug.message);
+});
+
+test('review F-01 E2: a permanent 301/308 move (real fetch, redirect:error) is a request problem, red', async () => {
+  for (const status of [301, 308]) {
+    const server = await localServer((_req, res) => { res.writeHead(status, { location: 'http://127.0.0.1:1/new' }); res.end(); });
+    try {
+      const error = await requestJson('jolpica', server.url('/ergast/f1/current.json'), {}, { timeoutMs: 3_000 }).then(() => assert.fail('must throw'), (failure: unknown) => failure);
+      assert.ok(error instanceof ProviderError);
+      assert.equal(error.code, 'redirect');
+      assert.equal(classifyProviderFailure(error), 'request-rejected');
+    } finally { await server.close(); }
+  }
+});
+
+test('review F-01: TLS/certificate failures are configuration; real network failures stay outages', async () => {
+  const via = (thrown: unknown) => failureOf((async () => { throw thrown; }) as typeof fetch);
+  for (const code of ['CERT_HAS_EXPIRED', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'ERR_TLS_CERT_ALTNAME_INVALID', 'SELF_SIGNED_CERT_IN_CHAIN'])
+    assert.equal(classifyProviderFailure(await via(undiciFailure(Object.assign(new Error('certificate problem'), { code })))), 'configuration', code);
+  for (const code of ['ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'EHOSTUNREACH', 'EPIPE', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT'])
+    assert.equal(classifyProviderFailure(await via(undiciFailure(Object.assign(new Error('network'), { code })))), 'provider-unavailable', code);
+  assert.equal(classifyProviderFailure(await via(Object.assign(new TypeError('terminated'), { cause: Object.assign(new Error('other side closed'), { code: 'UND_ERR_SOCKET' }) }))), 'provider-unavailable');
+  assert.equal(classifyProviderFailure(await via(new DOMException('The operation was aborted.', 'AbortError'))), 'provider-unavailable');
+  assert.equal(classifyProviderFailure(await via(new DOMException('signal timed out', 'TimeoutError'))), 'provider-unavailable');
+  // A real refused connection through undici: a port that was just closed.
+  const closed = await localServer((_req, res) => res.end());
+  const port = new URL(closed.url('/')).port;
+  await closed.close();
+  const refused = await requestJson('jolpica', `http://127.0.0.1:${port}/x.json`, {}, { timeoutMs: 3_000 }).catch((failure: unknown) => failure);
+  assert.equal(classifyProviderFailure(refused), 'provider-unavailable');
+  // fetch's own blocked-port refusal ("bad port") is our configuration, not an outage.
+  assert.equal(isProviderUnavailable(await requestJson('jolpica', 'http://127.0.0.1:1/x.json', {}, { timeoutMs: 3_000 }).catch((failure: unknown) => failure)), false);
+});
+
+test('review F-04 E3: a provider JSON 4xx is a request problem whatever its size or read time', async () => {
+  const server = await localServer((req, res) => {
+    res.writeHead(400, { 'content-type': 'application/json' });
+    if (req.url === '/big') res.end(JSON.stringify({ detail: `Bad Request: ${'x'.repeat(5_000)}` }));
+    else res.write('{"detail":"Bad'); // never finishes
+  });
+  try {
+    for (const path of ['/big', '/stalled']) {
+      const error = await requestJson('jolpica', server.url(path), {}, { timeoutMs: 3_000 }).then(() => assert.fail('must throw'), (failure: unknown) => failure);
+      assert.ok(error instanceof ProviderError, path);
+      assert.equal(error.origin, 'provider', path);
+      assert.equal(classifyProviderFailure(error), 'request-rejected', path);
+    }
+  } finally { await server.close(); }
+});
+
+test('review F-06: a failed response adds no body-read wait (only a capped quota peek on JSON 403)', async () => {
+  const stalled = (status: number, type: string) => (async () => new Response(new ReadableStream({ start() { /* never enqueues or closes */ } }), { status, headers: { 'content-type': type } })) as typeof fetch;
+  for (const [status, type, limit] of [[500, 'application/json', 50], [400, 'application/json', 50], [400, 'text/html', 50], [429, 'application/json', 50], [403, 'application/json', 400]] as const) {
+    const started = performance.now();
+    const error = await failureOf(stalled(status, type));
+    const elapsed = performance.now() - started;
+    assert.ok(error instanceof ProviderError, String(status));
+    assert.ok(elapsed < limit, `HTTP ${status} ${type}: ${elapsed.toFixed(0)} ms`);
+  }
 });

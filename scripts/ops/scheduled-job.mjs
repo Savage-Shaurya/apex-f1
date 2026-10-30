@@ -57,20 +57,34 @@ export function parseArgs(argv) {
   return { job, staleAfterHours, npmOutput, command };
 }
 
+/** Only this wrapper asks GitHub for the last verified run; the wrapped command never needs the token (review F-07). */
+const WRAPPER_ONLY_ENV = ['GITHUB_TOKEN', 'GH_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN'];
+
 /** Run a command with inherited output, keeping the last 16 KB for classification only (never printed again). */
-export function runCommand([tool, ...args], { env = process.env } = {}) {
+export function runCommand([tool, ...args], { env = process.env, stdout = process.stdout, stderr = process.stderr } = {}) {
+  const childEnv = { ...env };
+  for (const name of WRAPPER_ONLY_ENV) delete childEnv[name];
   return new Promise((resolve) => {
-    const child = spawn(tool, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(tool, args, { env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
     let tail = '';
     const keep = (chunk, stream) => { stream.write(chunk); tail = (tail + chunk.toString('utf8')).slice(-16_384); };
-    child.stdout.on('data', (chunk) => keep(chunk, process.stdout));
-    child.stderr.on('data', (chunk) => keep(chunk, process.stderr));
+    child.stdout.on('data', (chunk) => keep(chunk, stdout));
+    child.stderr.on('data', (chunk) => keep(chunk, stderr));
     child.on('error', (error) => resolve({ code: 127, output: `spawn ${error.code ?? 'error'}` }));
     child.on('close', (code, signal) => resolve({ code: code ?? (signal ? 128 : 1), output: tail }));
   });
 }
 
-/** Newest verified success of this workflow (epoch ms), or null when none is on record or GitHub cannot say. */
+/** Only these runs can prove a real backup or audit happened (review F-03). */
+const TRUSTED_EVENTS = ['schedule', 'workflow_dispatch'];
+
+/**
+ * Newest verified success of this workflow (epoch ms), or null when none is on
+ * record or GitHub cannot say. Only runs of THIS workflow file, from this
+ * repository's default branch, started by `schedule` or `workflow_dispatch`
+ * count: a fork pull request or a branch that edits the workflow cannot plant
+ * a "Record verified success" step (review F-03).
+ */
 export async function lastVerifiedSuccess(env, fetchImpl = fetch, { maxRuns = 10, timeoutMs = 10_000 } = {}) {
   const repo = env.GITHUB_REPOSITORY;
   const token = env.GITHUB_TOKEN;
@@ -85,17 +99,26 @@ export async function lastVerifiedSuccess(env, fetchImpl = fetch, { maxRuns = 10
     return response.json();
   };
   try {
-    const runs = await get(`/actions/workflows/${encodeURIComponent(workflow)}/runs?status=success&per_page=${maxRuns}`);
-    for (const run of Array.isArray(runs?.workflow_runs) ? runs.workflow_runs.slice(0, maxRuns) : []) {
-      if (!Number.isSafeInteger(run?.id)) continue;
+    const repository = await get('');
+    const branch = typeof repository?.default_branch === 'string' && /^[A-Za-z0-9._/-]{1,200}$/.test(repository.default_branch) ? repository.default_branch : null;
+    if (!branch) return null;
+    const listings = await Promise.all(TRUSTED_EVENTS.map((event) =>
+      get(`/actions/workflows/${encodeURIComponent(workflow)}/runs?status=success&branch=${encodeURIComponent(branch)}&event=${event}&per_page=${maxRuns}`)));
+    const trusted = listings
+      .flatMap((listing) => (Array.isArray(listing?.workflow_runs) ? listing.workflow_runs : []))
+      .filter((run) => Number.isSafeInteger(run?.id) && TRUSTED_EVENTS.includes(run.event) && run.head_branch === branch
+        && run.head_repository?.full_name === repo && typeof run.path === 'string' && run.path.replace(/@.*$/, '') === `.github/workflows/${workflow}`)
+      .sort((a, b) => (Date.parse(b.created_at ?? '') || b.id) - (Date.parse(a.created_at ?? '') || a.id));
+    let newest = null;
+    for (const run of trusted.slice(0, maxRuns)) {
       const jobs = await get(`/actions/runs/${run.id}/jobs?per_page=20`);
       for (const job of Array.isArray(jobs?.jobs) ? jobs.jobs : []) {
         const marker = (Array.isArray(job?.steps) ? job.steps : []).find((step) => step?.name === SUCCESS_MARKER_STEP && step?.conclusion === 'success');
         const at = Date.parse(marker?.completed_at ?? '');
-        if (Number.isFinite(at)) return at;
+        if (Number.isFinite(at) && (newest === null || at > newest)) newest = at;
       }
     }
-    return null;
+    return newest;
   } catch {
     return null;
   }

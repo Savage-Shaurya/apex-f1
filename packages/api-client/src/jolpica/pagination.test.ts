@@ -50,7 +50,11 @@ test('Next.js control-flow errors pass through provider wrappers untouched', asy
   assert.equal(isFrameworkControlError(Object.assign(new Error('x'), { digest: '12345' })), false);
   await assert.rejects(withProviderDeadline('jolpica', async () => { throw dynamic; }), (error) => error === dynamic);
   assert.throws(() => failOr('jolpica', dynamic, false, []), (error) => error === dynamic);
-  // Ordinary failures still become redacted provider errors / fallbacks.
-  await assert.rejects(withProviderDeadline('jolpica', async () => { throw new Error('socket'); }), (error) => error instanceof ProviderError && error.code === 'network');
+  // Real socket failures still become redacted provider errors / fallbacks; any other thrown
+  // error is our own bug and passes through unchanged (review F-01, 2026-10-31).
+  const socket = Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('socket'), { code: 'ECONNRESET' }) });
+  await assert.rejects(withProviderDeadline('jolpica', async () => { throw socket; }), (error) => error instanceof ProviderError && error.code === 'network');
+  const bug = new Error('socket');
+  await assert.rejects(withProviderDeadline('jolpica', async () => { throw bug; }), (error) => error === bug);
   assert.deepEqual(failOr('jolpica', new Error('socket'), false, []), []);
 });

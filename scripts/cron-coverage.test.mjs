@@ -82,3 +82,53 @@ test('scheduled workflows reach crons only through invoke-cron.mjs and other job
     assert.doesNotMatch(text, /continue-on-error:\s*true/, `${name} must not hide failures`);
   }
 });
+
+// Review F-05: each staleness limit must cover the longest gap between the job's own scheduled
+// runs plus one day of outage tolerance, or a healthy job goes red on its first failing run.
+function cronMatches(expression, date) {
+  const [minute, hour, dom, month, dow] = expression.trim().split(/\s+/);
+  const field = (spec, value, min, max) => spec.split(',').some((part) => {
+    const [range, stepText] = part.split('/');
+    const step = stepText ? Number(stepText) : 1;
+    let [from, to] = range === '*' ? [min, max] : range.split('-').map(Number);
+    if (to === undefined) to = stepText ? max : from;
+    return value >= from && value <= to && (value - from) % step === 0;
+  });
+  return field(minute, date.getUTCMinutes(), 0, 59) && field(hour, date.getUTCHours(), 0, 23) && field(dom, date.getUTCDate(), 1, 31) && field(month, date.getUTCMonth() + 1, 1, 12) && field(dow, date.getUTCDay(), 0, 6);
+}
+function longestGapHours(expressions) {
+  const start = Date.UTC(2026, 10, 2); // Monday 2026-11-02, two full weeks
+  let previous = null, longest = 0;
+  for (let at = start; at < start + 14 * 86_400_000; at += 60_000) {
+    const date = new Date(at);
+    if (!expressions.some((expression) => cronMatches(expression, date))) continue;
+    if (previous !== null) longest = Math.max(longest, (at - previous) / 3_600_000);
+    previous = at;
+  }
+  return longest;
+}
+
+test('review F-05: every staleness limit covers its schedule gap + 24 h', async () => {
+  assert.equal(longestGapHours(['4-54/10 * * * 5,6,0', '4-54/10 0-6 * * 1']), 89 + 10 / 60, 'Monday 06:54 -> Friday 00:04');
+  for (const { name, text } of await workflows()) {
+    if (!/^\s*schedule:/m.test(text)) continue;
+    const crons = [...text.matchAll(/cron: ["']([^"']+)["']/g)].map((match) => match[1]);
+    const gap = longestGapHours(crons);
+    for (const match of text.matchAll(/node scripts\/invoke-cron\.mjs ([a-z-]+)/g))
+      assert.ok(STALE_AFTER_HOURS[match[1]] >= gap + 24, `${name}: ${match[1]} limit ${STALE_AFTER_HOURS[match[1]]} h < gap ${gap.toFixed(1)} h + 24 h`);
+    for (const match of text.matchAll(/--stale-after-hours=(\d+)/g))
+      assert.ok(Number(match[1]) >= gap + 24, `${name}: limit ${match[1]} h < gap ${gap.toFixed(1)} h + 24 h`);
+  }
+});
+
+test('review F-07: GITHUB_TOKEN only reaches scheduled-job.mjs, never another command in its step', async () => {
+  for (const { name, text } of await workflows()) {
+    for (const step of text.split(/\n\s*- (?=name:|uses:)/)) {
+      if (!/^\s*GITHUB_TOKEN:/m.test(step)) continue;
+      assert.match(step, /node scripts\/ops\/scheduled-job\.mjs/, `${name}: a step with GITHUB_TOKEN must be a scheduled-job.mjs step`);
+      const commands = step.split('\n').filter((line) => !/^\s*#/.test(line) && /\b(?:node|pnpm|npx|bash|sh|curl)\b/.test(line) && !/^\s*(?:run|name|[A-Z_]+):\s*$/.test(line));
+      for (const line of commands)
+        assert.ok(/scheduled-job\.mjs/.test(line) || /env -u GITHUB_TOKEN/.test(line), `${name}: "${line.trim()}" would inherit GITHUB_TOKEN`);
+    }
+  }
+});

@@ -70,7 +70,8 @@ jobs:
         run: |
           set +x
           # Mask the password part of the URL as well (GitHub already masks each whole secret).
-          pw="$(node -e 'try{process.stdout.write(decodeURIComponent(new URL(process.env.SUPABASE_BACKUP_DB_URL).password))}catch{}')"
+          # GITHUB_TOKEN is only for scheduled-job.mjs (last verified backup); it strips it from the backup itself.
+          pw="$(env -u GITHUB_TOKEN node -e 'try{process.stdout.write(decodeURIComponent(new URL(process.env.SUPABASE_BACKUP_DB_URL).password))}catch{}')"
           if [ -n "$pw" ]; then echo "::add-mask::$pw"; fi
           unset pw
           if [ -n "$SUPABASE_DB_CA_CERT" ]; then

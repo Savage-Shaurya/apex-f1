@@ -122,26 +122,32 @@ export function providerUnavailableResponse(
   });
 }
 
+/**
+ * 'success' = a full run (lastSuccessAt, the staleness alarm's clock);
+ * 'degraded' = an ok run that used a fallback (last-good calendar, some sources
+ * down). A degraded run never moves lastSuccessAt (review F-02).
+ */
+export type CronStatusKind = 'success' | 'degraded';
 export interface CronStatusStore {
-  read(route: string): Promise<number | null>;
-  write(route: string, at: number): Promise<void>;
+  read(route: string, kind?: CronStatusKind): Promise<number | null>;
+  write(route: string, at: number, kind?: CronStatusKind): Promise<void>;
 }
 
 const STATUS_TTL_S = 30 * 86_400;
-export function cronLastSuccessKey(route: string, env: Readonly<Record<string, string | undefined>> = process.env): string {
+export function cronLastSuccessKey(route: string, env: Readonly<Record<string, string | undefined>> = process.env, kind: CronStatusKind = 'success'): string {
   if (!/^[a-z0-9-]{1,40}$/.test(route)) throw new Error('Invalid cron route.');
-  return scopedRedisKey(`apex:cron:v1:last-success:${route}`, env);
+  return scopedRedisKey(`apex:cron:v1:last-${kind}:${route}`, env);
 }
 
 const processGlobals = globalThis as typeof globalThis & { __apexCronLastSuccess?: Map<string, number> };
 const memory = () => (processGlobals.__apexCronLastSuccess ??= new Map());
-/** Test isolation only: forget this process's remembered successes. */
+/** Test isolation only: forget this process's remembered runs. */
 export function forgetCronSuccessesInProcess(): void { memory().clear(); }
 
 /**
- * Last successful run per route: this process's memory plus Upstash (shared by
- * every instance, environment-scoped, 30 days) when configured. Redis calls are
- * bounded (2 s); a failed read counts as unknown, never as recent.
+ * Last full / degraded run per route: this process's memory plus Upstash
+ * (shared by every instance, environment-scoped, 30 days) when configured.
+ * Redis calls are bounded (2 s); a failed read counts as unknown, never as recent.
  */
 export function defaultCronStatusStore(env: Readonly<Record<string, string | undefined>> = process.env, fetchImpl: typeof fetch = untrackedFetch()): CronStatusStore {
   const redis = lastGoodRedisConfig(env);
@@ -157,27 +163,37 @@ export function defaultCronStatusStore(env: Readonly<Record<string, string | und
     return ((await response.json()) as { result?: unknown }).result;
   };
   return {
-    async read(route) {
-      const local = memory().get(route) ?? null;
+    async read(route, kind = 'success') {
+      const local = memory().get(`${kind}:${route}`) ?? null;
       if (!redis) return local;
       let shared: number | null = null;
       try {
-        const value = await call(['GET', cronLastSuccessKey(route, env)]);
+        const value = await call(['GET', cronLastSuccessKey(route, env, kind)]);
         shared = typeof value === 'string' && /^\d{13}$/.test(value) ? Number(value) : null;
       } catch { shared = null; }
       return Math.max(local ?? 0, shared ?? 0) || null;
     },
-    async write(route, at) {
-      memory().set(route, Math.max(memory().get(route) ?? 0, at));
-      if (redis) await call(['SET', cronLastSuccessKey(route, env), String(at), 'EX', String(STATUS_TTL_S)]);
+    async write(route, at, kind = 'success') {
+      const key = `${kind}:${route}`;
+      memory().set(key, Math.max(memory().get(key) ?? 0, at));
+      if (redis) await call(['SET', cronLastSuccessKey(route, env, kind), String(at), 'EX', String(STATUS_TTL_S)]);
     },
   };
 }
 
+const iso = (at: number | null) => (at && Number.isFinite(at) ? new Date(at).toISOString() : null);
+function restamp(response: Response, report: Record<string, unknown>): Response {
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  return Response.json(report, { status: response.status, headers });
+}
+
 /**
- * Applied to every report a cron task returns: an ok report for this route
- * records the success; a provider-unavailable report gets lastSuccessAt.
- * Bookkeeping failures never change the job's outcome.
+ * Applied to every report a cron task returns. A full ok report records a
+ * success. A degraded ok report records only lastDegradedAt and carries the
+ * last FULL success, so the runner can go red once that is too old even while
+ * fallbacks keep the job "ok" (review F-02). A provider-unavailable report gets
+ * lastSuccessAt and lastDegradedAt. Bookkeeping failures never change the outcome.
  */
 export async function finalizeCronResponse(route: string, response: Response, store: CronStatusStore | null): Promise<Response> {
   if (!store || (response.status !== 200 && response.status !== 503)) return response;
@@ -187,15 +203,17 @@ export async function finalizeCronResponse(route: string, response: Response, st
   const report = body as Record<string, unknown>;
   if (report.route !== route) return response;
   if (response.status === 200 && report.ok === true) {
-    await store.write(route, Date.now()).catch(() => undefined);
-    return response;
+    if (report.degraded !== true) {
+      await store.write(route, Date.now(), 'success').catch(() => undefined);
+      return response;
+    }
+    await store.write(route, Date.now(), 'degraded').catch(() => undefined);
+    const at = await store.read(route, 'success').catch(() => null);
+    return restamp(response, { ...report, lastSuccessAt: iso(at) });
   }
   if (response.status === 503 && report.reason === PROVIDER_UNAVAILABLE && report.retryable === true) {
-    const at = await store.read(route).catch(() => null);
-    const stamped = { ...report, lastSuccessAt: at && Number.isFinite(at) ? new Date(at).toISOString() : null };
-    const headers = new Headers(response.headers);
-    headers.delete('content-length');
-    return Response.json(stamped, { status: 503, headers });
+    const [success, degraded] = await Promise.all([store.read(route, 'success').catch(() => null), store.read(route, 'degraded').catch(() => null)]);
+    return restamp(response, { ...report, lastSuccessAt: iso(success), lastDegradedAt: iso(degraded) });
   }
   return response;
 }
