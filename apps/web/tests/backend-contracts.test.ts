@@ -25,7 +25,6 @@ const keys = [
   "DATABASE_URL",
   "UPSTASH_REDIS_REST_URL",
   "UPSTASH_REDIS_REST_TOKEN",
-  "DISTRIBUTED_RATE_LIMIT_REQUIRED",
 ] as const;
 const originals = Object.fromEntries(
   keys.map((key) => [key, process.env[key]]),

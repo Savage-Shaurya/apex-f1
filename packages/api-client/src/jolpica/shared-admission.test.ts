@@ -89,30 +89,35 @@ test("reservation subtracts full transport round trip from the lease instead of 
   assert.equal(result.remainingMs, 0);
 });
 
-test("malformed Redis shapes and upstream errors fail closed", async () => {
-  for (const value of [
-    [1, 10, 35000],
-    [0, 0, 0],
-    [1, 0, 40000],
-    [0, 3600002, 0],
-    [1],
-    "ok",
-    null,
-  ]) {
-    const store = createJolpicaSharedAdmission(config, {
-      fetch: async () => Response.json({ result: value }),
-    });
-    await assert.rejects(store.reserve("owner-one", signal()), ProviderError);
-  }
-  const store = createJolpicaSharedAdmission(config, {
-    fetch: async () =>
-      Response.json({ error: "OPAQUE_PRIVATE_PROVIDER_ERROR" }),
-  });
-  await assert.rejects(
-    store.reserve("owner-one", signal()),
-    (error) =>
-      error instanceof ProviderError && !error.message.includes("OPAQUE"),
-  );
+test("malformed Redis shapes and command errors are our bug: redis-invalid-reply, never a Jolpica answer (review R-06)", async () => {
+  const errors = console.error;
+  console.error = () => {};
+  try {
+    for (const value of [
+      [1, 10, 35000],
+      [0, 0, 0],
+      [1, 0, 40000],
+      [0, 3600002, 0],
+      [1],
+      "ok",
+      null,
+    ]) {
+      const store = createJolpicaSharedAdmission(config, {
+        fetch: async () => Response.json({ result: value }),
+      });
+      await assert.rejects(store.reserve("owner-one", signal()), (error: Error & { kind?: string }) => error.name === "RedisUnavailableError" && error.kind === "redis-invalid-reply");
+    }
+    for (const reply of [
+      () => Response.json({ error: "OPAQUE_PRIVATE_PROVIDER_ERROR" }),
+      () => Response.json({ error: "OPAQUE_PRIVATE_PROVIDER_ERROR" }, { status: 400 }),
+    ]) {
+      const store = createJolpicaSharedAdmission(config, { fetch: async () => reply() });
+      await assert.rejects(
+        store.reserve("owner-one", signal()),
+        (error: Error & { kind?: string }) => error.name === "RedisUnavailableError" && error.kind === "redis-invalid-reply" && !error.message.includes("OPAQUE"),
+      );
+    }
+  } finally { console.error = errors; }
 });
 
 test("an explicitly required but missing shared store starts zero provider requests; a failing store degrades to local pacing (Redis optional, 2026-10-31)", async () => {

@@ -6,7 +6,7 @@ import { loginAdmin, logoutAdmin, inspectAdminSession } from '../lib/admin-sessi
 import { proxy } from '../proxy';
 import { NextRequest } from 'next/server';
 
-const keys = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'ADMIN_USERS_JSON', 'ADMIN_PASSWORD', 'ADMIN_LOCAL_DEV_BYPASS', 'ADMIN_SESSION_SECRET', 'ADMIN_MFA_SECRETS_JSON', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'DISTRIBUTED_RATE_LIMIT_REQUIRED'];
+const keys = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'ADMIN_USERS_JSON', 'ADMIN_PASSWORD', 'ADMIN_LOCAL_DEV_BYPASS', 'ADMIN_SESSION_SECRET', 'ADMIN_MFA_SECRETS_JSON', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'];
 const original = new Map(keys.map(key => [key, process.env[key]]));
 const originalFetch = fetch;
 const password = 'isolated-session-test-password-20261004';
@@ -70,7 +70,7 @@ function fixtureFetch(): typeof fetch {
 }
 beforeEach(() => {
   for (const key of keys) delete process.env[key];
-  Object.assign(process.env, { NODE_ENV: 'production', VERCEL: '1', ADMIN_SESSION_SECRET: Buffer.alloc(32, 42).toString('base64url'), ADMIN_MFA_SECRETS_JSON: JSON.stringify({ owner: secret }), UPSTASH_REDIS_REST_URL: 'https://session-test.upstash.io', UPSTASH_REDIS_REST_TOKEN: 'private-synthetic-test-token', DISTRIBUTED_RATE_LIMIT_REQUIRED: 'true' });
+  Object.assign(process.env, { NODE_ENV: 'production', VERCEL: '1', ADMIN_SESSION_SECRET: Buffer.alloc(32, 42).toString('base64url'), ADMIN_MFA_SECRETS_JSON: JSON.stringify({ owner: secret }), UPSTASH_REDIS_REST_URL: 'https://session-test.upstash.io', UPSTASH_REDIS_REST_TOKEN: 'private-synthetic-test-token' });
   actors(); now = Date.now(); rows = new Map(); counts = new Map(); operations = [];
   globalThis.fetch = fixtureFetch();
 });

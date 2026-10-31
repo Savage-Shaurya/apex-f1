@@ -69,6 +69,36 @@ export function redisFingerprintStore(config: { url: string; token: string }, fe
   };
 }
 
+const fingerprintGlobals = globalThis as typeof globalThis & { __apexWeekendWatchMemory?: Map<string, string> };
+/**
+ * Redis is optional (review R-07). This process remembers every fingerprint it
+ * read or wrote; when Redis is missing or failing, the memory answers, so a
+ * warm instance does not re-purge pages and re-ingest the season every 10
+ * minutes. Only a cold instance with Redis down sees "unknown" (one extra
+ * revalidation, then it remembers).
+ */
+/** Test isolation: forget this process's remembered fingerprints. */
+export function forgetWeekendWatchFingerprints(): void { fingerprintGlobals.__apexWeekendWatchMemory?.clear(); }
+
+export function layeredFingerprintStore(redis: FingerprintStore | null, memory: Map<string, string> = (fingerprintGlobals.__apexWeekendWatchMemory ??= new Map())): FingerprintStore {
+  return {
+    async get(key) {
+      if (redis) {
+        try {
+          const shared = await redis.get(key);
+          if (shared !== null) { memory.set(key, shared); return shared; }
+        } catch { /* Redis unavailable: the process memory answers */ }
+      }
+      return memory.get(key) ?? null;
+    },
+    async set(key, value) {
+      memory.set(key, value);
+      if (memory.size > 512) memory.delete(memory.keys().next().value!);
+      if (redis) await redis.set(key, value).catch(() => undefined);
+    },
+  };
+}
+
 export interface WatchRace extends RaceTimes { round: number; routeSlug?: string | null; slug: string }
 
 export interface WeekendWatchDependencies {

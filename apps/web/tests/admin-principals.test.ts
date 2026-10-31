@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server';
 import { ADMIN_CAPABILITIES, LEGACY_ADMIN_CAPABILITIES, authorizeAdminRequest, configuredAdminUsers, hashAdminPassword, hasAdminCapability, isLocalDev } from '../lib/admin-auth';
 import { config, proxy } from '../proxy';
 
-const keys = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'ADMIN_PASSWORD', 'ADMIN_USERS_JSON', 'ADMIN_LOCAL_DEV_BYPASS', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'DISTRIBUTED_RATE_LIMIT_REQUIRED'] as const;
+const keys = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'ADMIN_PASSWORD', 'ADMIN_USERS_JSON', 'ADMIN_LOCAL_DEV_BYPASS', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'] as const;
 const originals = new Map(keys.map(key => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 const password = 'synthetic-administrator-password-20261004';

@@ -116,7 +116,8 @@ test('production startup check fails fast with field names (never values) and st
   assert.throws(() => assertProductionEnvironment(bad), (error: Error) => {
     assert.match(error.message, /ADMIN_LOCAL_DEV_BYPASS/);
     assert.match(error.message, /CRON_SECRET/);
-    assert.match(error.message, /UPSTASH_REDIS_REST_URL/);
+    // Redis is optional (review R-01): a missing Upstash store never stops startup.
+    assert.doesNotMatch(error.message, /UPSTASH_REDIS_REST_URL|DISTRIBUTED_RATE_LIMIT_REQUIRED/);
     assert.equal(error.message.includes('short-secret-value'), false);
     return true;
   });

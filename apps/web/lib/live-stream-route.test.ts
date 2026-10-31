@@ -12,7 +12,7 @@ const originalNodeEnv = process.env['NODE_ENV'];
 const originalUpstashUrl = process.env['UPSTASH_REDIS_REST_URL'];
 const originalUpstashToken = process.env['UPSTASH_REDIS_REST_TOKEN'];
 const testEnvironment = process.env as Record<string, string | undefined>;
-const originalRateLimitEnvironment = Object.fromEntries(['VERCEL', 'VERCEL_ENV', 'DISTRIBUTED_RATE_LIMIT_REQUIRED'].map((key) => [key, testEnvironment[key]]));
+const originalRateLimitEnvironment = Object.fromEntries(['VERCEL', 'VERCEL_ENV'].map((key) => [key, testEnvironment[key]]));
 const liveProcess = globalThis as typeof globalThis & {
   __apexLiveSessionHubV3?: NonNullable<ReturnType<typeof createConfiguredLiveSessionHub>>;
   __apexOpenLiveStreamsV2?: number;
@@ -21,7 +21,6 @@ beforeEach(() => {
   testEnvironment['NODE_ENV'] = 'development';
   delete testEnvironment['VERCEL'];
   delete testEnvironment['VERCEL_ENV'];
-  testEnvironment['DISTRIBUTED_RATE_LIMIT_REQUIRED'] = 'false';
   delete process.env['UPSTASH_REDIS_REST_URL'];
   delete process.env['UPSTASH_REDIS_REST_TOKEN'];
   openf1.getLatestSession = async () => null;

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { ArrowLink, Heading, Label, StatusBadge, Text } from '@/components/ds';
 import { adminAuthenticationConfigured } from '@/lib/admin-auth';
+import { redisAvailability } from '@/lib/health';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,10 +11,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-interface Check { label: string; ok: boolean; on: string; off: string; consequence: string }
+interface Check { label: string; ok: boolean; on: string; off: string; consequence: string; badge?: string }
 
-/** Configuration only: nothing here connects to a service, so nothing claims a service is healthy. */
+function redisReason(kind: string | null): string {
+  if (kind === 'redis-quota') return 'its request quota is spent';
+  if (kind === 'redis-auth') return 'its credentials were refused';
+  if (kind === 'redis-invalid-reply') return 'it returned a reply the code did not expect';
+  return 'it did not answer';
+}
+
+/** Configuration, plus this server's own knowledge of the shared store; nothing here connects to a service. */
 export default function AdminHome() {
+  const redis = redisAvailability();
   const checks: Check[] = [
     {
       label: 'Article storage',
@@ -30,11 +39,14 @@ export default function AdminHome() {
       consequence: 'Deployed sign-in is closed until credentials and second factors are provisioned.',
     },
     {
-      label: 'Shared rate limiter',
-      ok: Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
-      on: 'Upstash is configured, so limits are shared across server instances.',
-      off: 'Upstash is not configured.',
-      consequence: 'Rate limits apply per server instance only.',
+      label: 'Shared store (Redis)',
+      ok: redis.state === 'shared',
+      badge: redis.state === 'shared' ? 'Configured' : redis.state === 'unavailable' ? 'Unavailable now' : 'Not configured',
+      on: 'Upstash is configured and this server has had no recent failure, so limits and provider budgets are shared across instances.',
+      off: redis.state === 'unavailable'
+        ? `Upstash is configured but currently unavailable on this server (${redisReason(redis.kind)}).`
+        : 'Upstash is not configured.',
+      consequence: 'Reads use per-instance limits; public writes and administrator sign-in answer "try again later" until it is back.',
     },
     {
       label: 'Newsletter delivery',
@@ -49,7 +61,7 @@ export default function AdminHome() {
     <article>
       <Heading level={1} size="heading-l">Overview</Heading>
       <Text tone="muted" className="mt-2" measure>
-        What this deployment is configured with. This page reads configuration only; it does not test connections.
+        What this deployment is configured with. This page does not test connections; the shared store line also reflects failures this server has already seen.
       </Text>
 
       <section aria-labelledby="status-title" className="mt-10">
@@ -59,7 +71,7 @@ export default function AdminHome() {
             <li key={c.label} className="bg-tone-raised p-5 md:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="font-text text-heading-s text-fg">{c.label}</h3>
-                <StatusBadge status={c.ok ? 'finished' : 'unavailable'}>{c.ok ? 'Configured' : 'Not configured'}</StatusBadge>
+                <StatusBadge status={c.ok ? 'finished' : 'unavailable'}>{c.badge ?? (c.ok ? 'Configured' : 'Not configured')}</StatusBadge>
               </div>
               <p className="mt-3 font-text text-small text-fg-2">{c.ok ? c.on : c.off}</p>
               {!c.ok && <p className="mt-1 font-text text-small font-[650] text-fg">{c.consequence}</p>}

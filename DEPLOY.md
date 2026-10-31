@@ -46,6 +46,9 @@ Jolpica F1 is free and its origin is overloaded on race weekends (uncached reads
 
 On 30-31 October the free Upstash plan ran out of its monthly commands (500,000). Upstash then answers every data command with HTTP 400 `ERR max requests limit exceeded` (PING still answers 200). That reply failed every Jolpica read at the shared admission step, so crons answered 500/503 and the production build failed (`jolpica-admission: http (HTTP 400)` while collecting `/teams/[slug]/history`). Upstash is now optional: nothing in the build, a page or a cron depends on it.
 
+- **Startup**: Upstash is not required to start, in production either. Missing or malformed Upstash variables log a `startup.config-warning` (`UPSTASH_REDIS_REST_URL (shared-store-missing)`); the server starts, reads work, writes and admin sign-in answer 503. `DISTRIBUTED_RATE_LIMIT_REQUIRED` was removed (it no longer did anything).
+- **Caller cancellations are not Redis failures**: a client disconnect or page deadline aborts with the caller's reason and never counts; only our own Redis deadline (a `TimeoutError` abort reason) does. After a breaker window exactly one call probes (half-open); the others stay local until it succeeds or its 10 s lease ends.
+- **A reply our script cannot produce is our bug** (an Upstash command error, a wrong shape from the admission or rate-limit script): logged once per trip at error level (`kind: redis-invalid-reply`) and the breaker opens for 15 minutes, so it does not cost a command per read.
 - **One guard for every Upstash call** (`packages/api-client/src/redis-guard.ts`). A quota reply (400 "limit exceeded", 429) or an auth failure (401/403) opens this process's breaker at once for 15 minutes; a transient failure (5xx, 408, timeout, refused or reset connection, a body that is not Upstash JSON) opens it for 30 s after two in a row. While it is open, calls fail at once without a network request. Each trip logs one line `{"event":"redis.breaker.open","kind","consumer","status","retryInMs"}` (never a URL, key or token). A Redis failure is its own class (`classifyProviderFailure` → `redis-unavailable`), never a provider outage and never fatal.
 - **What degrades, and to what:**
 
@@ -54,11 +57,12 @@ On 30-31 October the free Upstash plan ran out of its monthly commands (500,000)
 | Jolpica admission (budget, start gap, 429 backoff) | This process's pacing: 260 ms start gap, 500 starts per hour, its own 429 pauses. `next build` never uses the shared admission (also fixes a second bug: its 90 s queue allowance was longer than the 35 s lease, so every build read was refused after reserving). |
 | Jolpica / OpenF1 last-good copies | Process cache only. Build writes none. |
 | OpenF1 page reads (grid timing) | Direct OpenF1 reads paced at the shared gap (2.3 s) in this process, with the last-good fallback. |
-| Rate limits | Every bucket keeps a limit: this instance's in-memory window with the same limit (reads stay open; newsletter, predictions, articles and image writes stay limited, never unlimited). Administrator authentication (`failClosed`) answers 503: admin sessions live in Redis, so nobody can sign in without it. `DISTRIBUTED_RATE_LIMIT_REQUIRED` no longer changes this. |
+| Rate limits | Reads (`readFallback`: article, prediction and identity reads, live stream opening) keep this instance's in-memory window with the same limit, never unlimited. Every write (newsletter signup and recovery, predictions, identity setup, article writes, image generation) and administrator authentication answers **503 "Temporarily unavailable. Please try again later."** until Redis is back (owner decision 2026-10-31). Admin sessions live in Redis, so nobody can sign in without it. |
 | Cron `lastSuccessAt` | Process memory only; unknown (`null`) follows the runner rule above (red once a provider is unavailable). |
-| weekend-watch fingerprints | Unknown = changed: the classification pages are revalidated again (no data is lost). |
+| weekend-watch fingerprints | This process remembers every fingerprint it read or wrote; with Redis down a warm instance revalidates and ingests only on a real change. A cold instance revalidates (and, for a race with a database configured, re-ingests) once, then remembers. |
 | Championship epochs | Skipped (nothing reads them across processes). |
-| `/api/health` | Redis down = `degraded` (200), never `down`; not configured = reported, nothing degraded. The check uses the per-instance limiter and one cached PING per 5 minutes; an open breaker reports down without a call. |
+| `/api/health` | Redis down = `degraded` (200), never `down`; not configured = reported, nothing degraded. The check uses the per-instance limiter and one cached data command (`EXISTS` on a fixed scoped key) per 5 minutes, so a spent quota (where PING still answers 200) reads as down; an open breaker reports down without a call. |
+| Admin overview | "Shared store (Redis)": Configured / Unavailable now (quota, credentials, no answer, invalid reply) / Not configured, from this server's breaker. |
 
 ## Redis usage budget
 
@@ -73,6 +77,11 @@ Measured on a production build and server with a counting Upstash stub (`APEX_RE
 | Whole quota-stub run (build + pages + crons + 25 admin logins + health) | build failed | **1** command, then the breaker |
 
 Projected month (assumptions: 1,000 dynamic page renders a day, one uptime check a minute, 30 builds): pages ≈ 31,000, crons ≈ 7,800 (rss 2,880, weekend-watch ≈ 2,000, season ≈ 1,800, weather 720, videos ≈ 390), health ≤ 8,640, builds 0: **≈ 48,000 a month** (before: ≈ 356,000 pages + 86,400 health + crons + builds). A race weekend doubling page traffic stays near 80,000, inside the free 500,000. Prefer a separate Upstash database for previews and local runs.
+
+What the table does not cover (review R-09/R-10):
+- **Builds**: 0 commands while providers answer. A Jolpica read that fails during the build still asks the shared last-good copy once (one GET per failed key per build worker; capped by the breaker on a spent quota).
+- **Cold instances**: the counts are for one warm process. Each new serverless instance starts with an empty process memo: roughly 10-20 extra commands on its first renders. At an assumed 50-100 cold starts a day that is up to about 60,000 a month on top of the projection; still inside the free plan at current traffic.
+- **Live hub**: `/api/live/stream` (no UI links to it; realtime is out of scope) runs a distributed hub that reserves and publishes every few seconds while a stream is open: about 1,000-1,500 commands per streamed hour. It is not in the projection; nothing opens it today.
 
 Ceilings guarded by tests (they fail if usage creeps back): a `next build`'s Jolpica reads spend 0 commands (`packages/api-client/src/jolpica/redis-optional.test.ts`); 100 page reads of one Jolpica key on a warm instance ≤ 3; 100 page renders of one OpenF1 query ≤ 7 and a build-time OpenF1 page read 0 (`apps/web/tests/redis-optional.test.ts`); one weather-sync run ≤ 4, a repeat run ≤ 2 (`apps/web/tests/cron-outage-redis.test.ts`). Every process counts its own commands per consumer (`redisCommandStats()`).
 

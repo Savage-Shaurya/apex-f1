@@ -213,7 +213,9 @@ export async function withProviderDeadline<T>(
   let onAbort: (() => void) | undefined;
   const interrupted = new Promise<never>((_, reject) => {
     const fail = () => { controller.abort(); reject(new ProviderError(provider, 'timeout')); };
-    timer = setTimeout(fail, timeoutMs);
+    // Our own deadline aborts with a TimeoutError reason; a caller's cancellation with an
+    // AbortError. Shared-store guards count only the former against Redis (redis-guard.ts, R-02).
+    timer = setTimeout(() => { controller.abort(new DOMException('Provider deadline', 'TimeoutError')); reject(new ProviderError(provider, 'timeout')); }, timeoutMs);
     onAbort = fail;
     if (options.signal?.aborted) fail();
     else options.signal?.addEventListener('abort', fail, { once: true });

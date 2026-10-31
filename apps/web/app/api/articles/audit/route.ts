@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     cursor = parseEditorialCursor(url.searchParams.get('cursor'));
   } catch (error) { return errorResponse(error); }
   if (!process.env.DATABASE_URL) return json({ ok: false, error: 'Article storage is temporarily unavailable.' }, 503);
-  const quota = await rateLimitShared(req, { limit: 60, windowMs: 60_000, bucket: 'articles-read' });
+  const quota = await rateLimitShared(req, { limit: 60, windowMs: 60_000, bucket: 'articles-read', readFallback: true });
   if (!quota.available) return rateLimitUnavailable(quota);
   if (!quota.ok) return tooMany(quota);
   try {

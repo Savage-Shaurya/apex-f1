@@ -12,7 +12,7 @@ const id = '10000000-0000-4000-8000-000000000001';
 const revision = '2026-10-03 12:13:14.123456+00';
 const body = { title: 'Apex analysis', slug: 'apex-analysis', bodyMd: '## Strategy\n\nVerified reporting.', section: 'ANALYSIS', dek: 'Race review', status: 'draft' };
 const article: EditorialArticle = { ...body, id, revision, status: 'draft', visibility: 'draft', editable: true, publishedAt: null };
-const keys = ['NODE_ENV', 'ADMIN_PASSWORD', 'ADMIN_USERS_JSON', 'ADMIN_LOCAL_DEV_BYPASS', 'DATABASE_URL', 'VERCEL', 'VERCEL_ENV', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'DISTRIBUTED_RATE_LIMIT_REQUIRED'] as const;
+const keys = ['NODE_ENV', 'ADMIN_PASSWORD', 'ADMIN_USERS_JSON', 'ADMIN_LOCAL_DEV_BYPASS', 'DATABASE_URL', 'VERCEL', 'VERCEL_ENV', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'] as const;
 const originals = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 beforeEach(() => { for (const key of keys) delete process.env[key]; Object.assign(process.env, { NODE_ENV: 'test' }); globalThis.fetch = async () => { throw new Error('Unexpected external request'); }; });

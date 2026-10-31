@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ProviderError, requestJson, untrackedFetch, withProviderDeadline } from "../transport";
 import { scopedRedisKey } from "../redis-scope";
 import { isBuildPhase } from "../build-phase";
-import { guardedRedisFetch, isRedisUnavailable } from "../redis-guard";
+import { guardedRedisFetch, invalidRedisReply, isRedisUnavailable } from "../redis-guard";
 
 export interface JolpicaRedisConfig {
   url: string;
@@ -125,28 +125,37 @@ export function createJolpicaRedisTransport(
   return async (command: string[], signal: AbortSignal): Promise<unknown> => {
     // Labelled apart from Jolpica: an Upstash failure (quota, auth, outage) must
     // never read as "jolpica: http (HTTP 400)" in a cron report (2026-10-31).
-    const result = await requestJson<unknown>(
-      "jolpica-admission",
-      config.url,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.token}`,
-          "Content-Type": "application/json",
+    let result: unknown;
+    try {
+      result = await requestJson<unknown>(
+        "jolpica-admission",
+        config.url,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${config.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(command),
+          cache: "no-store",
         },
-        body: JSON.stringify(command),
-        cache: "no-store",
-      },
-      {
-        signal,
-        // Admission EVALs are control traffic: never cached by Next and never
-        // a reason to render a page dynamically. Guarded: a quota/auth/outage
-        // reply opens this process's Redis breaker (redis-guard.ts).
-        fetchImpl: guardedRedisFetch("jolpica-admission", options.fetch ?? untrackedFetch()),
-        timeoutMs: options.timeoutMs ?? 2000,
-        maxBytes: options.maxBytes ?? 4_100_000,
-      },
-    );
+        {
+          signal,
+          // Admission EVALs are control traffic: never cached by Next and never
+          // a reason to render a page dynamically. Guarded: a quota/auth/outage
+          // reply opens this process's Redis breaker (redis-guard.ts).
+          fetchImpl: guardedRedisFetch("jolpica-admission", options.fetch ?? untrackedFetch()),
+          timeoutMs: options.timeoutMs ?? 2000,
+          maxBytes: options.maxBytes ?? 4_100_000,
+        },
+      );
+    } catch (error) {
+      // Upstash answered a command error (4xx JSON, e.g. a bad script): our bug (R-06).
+      if (error instanceof ProviderError && error.code === "http" && (error.status ?? 0) < 500) throw invalidRedisReply("jolpica-admission", options.fetch);
+      throw error;
+    }
+    // A command error (bad script) or a foreign shape is our bug: loud, and the
+    // breaker stops it costing a command per read (review R-06).
     if (
       !result ||
       typeof result !== "object" ||
@@ -154,7 +163,7 @@ export function createJolpicaRedisTransport(
       "error" in result ||
       !("result" in result)
     )
-      throw new ProviderError("jolpica", "configuration");
+      throw invalidRedisReply("jolpica-admission", options.fetch);
     return (result as { result: unknown }).result;
   };
 }
@@ -209,7 +218,7 @@ export function createJolpicaSharedAdmission(
           (value[1] !== 0 || value[2] !== JOLPICA_DISPATCH_MS)) ||
         (value[0] === 0 && (value[1] < 1 || value[2] !== 0))
       )
-        throw new ProviderError("jolpica", "configuration");
+        throw invalidRedisReply("jolpica-admission", options.fetch);
       return {
         admitted: value[0] === 1,
         retryMs: value[1],
@@ -222,7 +231,7 @@ export function createJolpicaSharedAdmission(
         ["EVAL", JOLPICA_COMPLETE_SCRIPT, "1", `${prefix}:dispatches`, owner],
         signal,
       );
-      if (value !== 1) throw new ProviderError("jolpica", "configuration");
+      if (value !== 1) throw invalidRedisReply("jolpica-admission", options.fetch);
     },
     async backoff(ms, signal, scope) {
       const pause = Math.round(Math.min(JOLPICA_MAX_BACKOFF_MS, Math.max(1000, ms)));
@@ -230,7 +239,7 @@ export function createJolpicaSharedAdmission(
         ["EVAL", JOLPICA_BACKOFF_SCRIPT, "1", backoffKey(prefix, scope), String(pause)],
         signal,
       );
-      if (value !== 1) throw new ProviderError("jolpica", "configuration");
+      if (value !== 1) throw invalidRedisReply("jolpica-admission", options.fetch);
     },
   };
 }

@@ -13,7 +13,10 @@
  *     that is not Upstash JSON) opens it after REDIS_TRANSIENT_TRIP_AFTER
  *     failures in a row, for a shorter window;
  *   - while it is open, calls fail at once with RedisUnavailableError and
- *     never touch the network; after the window one call probes again;
+ *     never touch the network; after the window exactly one call probes
+ *     while the others keep failing fast (half-open);
+ *   - a caller's own cancellation (its AbortSignal, not our Redis deadline)
+ *     is never a Redis failure;
  *   - each trip logs one structured warning (`redis.breaker.open`) carrying
  *     only the kind, status, consumer and window: never a URL, key or token.
  * Callers catch RedisUnavailableError and degrade to process-local behaviour
@@ -26,7 +29,7 @@
  */
 import { isFrameworkControlError, untrackedFetch } from './transport';
 
-export type RedisFailureKind = 'redis-quota' | 'redis-auth' | 'redis-unavailable';
+export type RedisFailureKind = 'redis-quota' | 'redis-auth' | 'redis-unavailable' | 'redis-invalid-reply';
 
 export class RedisUnavailableError extends Error {
   constructor(
@@ -55,14 +58,28 @@ export const REDIS_BREAKER_MS: Readonly<Record<RedisFailureKind, number>> = {
   'redis-quota': 15 * 60_000,
   'redis-auth': 15 * 60_000,
   'redis-unavailable': 30_000,
+  // A malformed script reply is our own bug: stop spending a command per read until it is fixed.
+  'redis-invalid-reply': 15 * 60_000,
 };
+/** After a window ends, one call probes; the others stay local for at most this long while it runs. */
+export const REDIS_PROBE_LEASE_MS = 10_000;
+
+/**
+ * Abort reason consumers use for their own Redis deadline. A signal aborted for
+ * any other reason (a client disconnect, a page deadline) is the caller's
+ * cancellation: it never counts as a Redis failure (review R-02).
+ */
+export function redisDeadlineReason(): DOMException { return new DOMException('Redis deadline', 'TimeoutError'); }
+function isDeadline(reason: unknown): boolean {
+  return reason instanceof Error && reason.name === 'TimeoutError';
+}
 /** Transient failures in a row before the breaker opens (quota/auth open at once). */
 export const REDIS_TRANSIENT_TRIP_AFTER = 2;
 /** Upstash replies larger than this are refused (largest legitimate value: OpenF1 snapshots, 2 MB). */
 const MAX_REPLY_BYTES = 4_200_000;
 const QUOTA_BODY = /limit exceeded|max requests|quota/i;
 
-interface Breaker { openUntil: number; kind: RedisFailureKind | null; transient: number }
+interface Breaker { openUntil: number; kind: RedisFailureKind | null; transient: number; probing: boolean }
 interface Counter { commands: number; calls: number; byConsumer: Map<string, number> }
 const globals = globalThis as typeof globalThis & {
   __apexRedisBreakers?: WeakMap<object, Breaker>;
@@ -75,7 +92,7 @@ const now = () => (globals.__apexRedisClock ?? Date.now)();
 
 function breakerFor(impl: typeof fetch): Breaker {
   let state = breakers().get(impl);
-  if (!state) { state = { openUntil: 0, kind: null, transient: 0 }; breakers().set(impl, state); }
+  if (!state) { state = { openUntil: 0, kind: null, transient: 0, probing: false }; breakers().set(impl, state); }
   return state;
 }
 
@@ -103,19 +120,40 @@ export function redisCommandStats(): { commands: number; calls: number; byConsum
 export function resetRedisCommandStats(): void { globals.__apexRedisCounter = { commands: 0, calls: 0, byConsumer: new Map() }; }
 
 function trip(state: Breaker, kind: RedisFailureKind, consumer: string, status?: number): void {
-  const wasOpen = state.openUntil > now();
+  const wasOpen = state.openUntil > now() && !state.probing;
   state.kind = kind;
   state.openUntil = now() + REDIS_BREAKER_MS[kind];
   state.transient = 0;
+  state.probing = false;
   if (!wasOpen) {
     // One line per trip; no URL, key, body or token ever reaches the log.
-    console.warn(JSON.stringify({ event: 'redis.breaker.open', kind, consumer, status: status ?? null, retryInMs: REDIS_BREAKER_MS[kind] }));
+    const line = JSON.stringify({ event: 'redis.breaker.open', kind, consumer, status: status ?? null, retryInMs: REDIS_BREAKER_MS[kind] });
+    // An invalid reply is our bug (review R-06): loud, at error level.
+    if (kind === 'redis-invalid-reply') console.error(line); else console.warn(line);
   }
+}
+
+function settleProbe(state: Breaker): void {
+  if (!state.probing) return;
+  state.probing = false;
+  state.kind = null;
+  state.openUntil = 0;
+}
+
+/**
+ * A Redis reply that does not match what our script returns is our own bug:
+ * open the breaker (so it stops costing a command per read), log once per
+ * trip at error level, and return the error to throw.
+ */
+export function invalidRedisReply(consumer: string, base?: typeof fetch): RedisUnavailableError {
+  trip(breakerFor(base ?? untrackedFetch()), 'redis-invalid-reply', consumer);
+  return new RedisUnavailableError('redis-invalid-reply', consumer);
 }
 
 function transientFailure(state: Breaker, consumer: string, status?: number): RedisUnavailableError {
   state.transient += 1;
-  if (state.transient >= REDIS_TRANSIENT_TRIP_AFTER) trip(state, 'redis-unavailable', consumer, status);
+  // A failed probe re-opens the breaker at once.
+  if (state.probing || state.transient >= REDIS_TRANSIENT_TRIP_AFTER) trip(state, 'redis-unavailable', consumer, status);
   return new RedisUnavailableError('redis-unavailable', consumer, status);
 }
 
@@ -173,6 +211,9 @@ export function guardedRedisFetch(consumer: string, base?: typeof fetch): typeof
     const impl = base ?? untrackedFetch();
     const state = breakerFor(impl);
     if (state.openUntil > now()) throw new RedisUnavailableError(state.kind ?? 'redis-unavailable', consumer);
+    // Half-open (review R-04): the first call after a window probes alone; the
+    // others keep failing fast until it settles (or its lease runs out).
+    if (state.kind !== null) { state.probing = true; state.openUntil = now() + REDIS_PROBE_LEASE_MS; }
     const c = counter();
     const sent = commandCount(init?.body);
     c.calls += 1;
@@ -199,7 +240,14 @@ export function guardedRedisFetch(consumer: string, base?: typeof fetch): typeof
       text = await readCapped(response, response.ok ? MAX_REPLY_BYTES : 4_096, init?.signal);
     } catch (error) {
       if (isRedisUnavailable(error) || isFrameworkControlError(error)) throw error;
-      // Timeout/abort, refused or reset connection, a stalled body: transient.
+      // The caller's own cancellation (client disconnect, page deadline) says nothing
+      // about Redis (review R-02): rethrown as is, never counted, probe released.
+      const signal = init?.signal;
+      if (signal?.aborted && !isDeadline(signal.reason)) {
+        if (state.probing) { state.probing = false; state.openUntil = 0; }
+        throw error;
+      }
+      // Our Redis deadline, refused or reset connection, a stalled body: transient.
       throw transientFailure(state, consumer);
     }
     if (text === null || !upstashShaped(text)) {
@@ -210,6 +258,7 @@ export function guardedRedisFetch(consumer: string, base?: typeof fetch): typeof
       throw new RedisUnavailableError('redis-quota', consumer, response.status);
     }
     state.transient = 0;
+    settleProbe(state);
     const headers = new Headers(response.headers);
     headers.delete('content-length');
     headers.delete('content-encoding');

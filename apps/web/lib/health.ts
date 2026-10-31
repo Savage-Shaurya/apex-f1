@@ -1,5 +1,6 @@
 import { resolveProviderBase } from '../../../packages/api-client/src/provider-base';
-import { guardedRedisFetch, redisBreakerOpen } from '../../../packages/api-client/src/redis-guard';
+import { guardedRedisFetch, redisBreakerOpen, redisBreakerState, type RedisFailureKind } from '../../../packages/api-client/src/redis-guard';
+import { scopedRedisKey } from '../../../packages/api-client/src/redis-scope';
 
 /**
  * Health checks behind /api/health. Each probe is bounded (2.5 s), runs in
@@ -79,20 +80,24 @@ export async function runHealthChecks(deps: HealthDeps): Promise<{ httpStatus: n
   };
 }
 
-/** Upstash REST PING; a 2xx with result "PONG" is healthy. */
+/**
+ * Upstash probe: one cheap DATA command (EXISTS on a fixed, environment-scoped
+ * key). PING still answers 200 on a spent quota (review R-05); a data command
+ * gets the quota-exceeded 400, so a spent quota reads as down.
+ */
 export async function pingRedis(env: Readonly<Record<string, string | undefined>> = process.env, signal?: AbortSignal): Promise<void> {
   const url = new URL(env.UPSTASH_REDIS_REST_URL ?? '');
   if (url.protocol !== 'https:') throw new Error('invalid');
   const response = await guardedRedisFetch('health')(url.origin, {
     method: 'POST',
     headers: { authorization: `Bearer ${env.UPSTASH_REDIS_REST_TOKEN ?? ''}`, 'content-type': 'application/json' },
-    body: JSON.stringify(['PING']),
+    body: JSON.stringify(['EXISTS', scopedRedisKey('apex:health:v1:probe', env)]),
     cache: 'no-store',
     redirect: 'error',
     signal,
   });
   const body = (await response.json().catch(() => null)) as { result?: unknown } | null;
-  if (!response.ok || body?.result !== 'PONG') throw new Error('unhealthy');
+  if (!response.ok || (body?.result !== 0 && body?.result !== 1)) throw new Error('unhealthy');
 }
 
 /** The smallest real request each provider answers; the local dev cache is honoured exactly as the clients do. */
@@ -102,9 +107,8 @@ export function providerProbeUrl(name: ProviderName, env: Readonly<Record<string
   return 'https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&current=temperature_2m';
 }
 
-// One Redis PING per instance per 5 minutes at most (uptime monitors check every minute).
-// PING still answers 200 on a spent Upstash quota, so an open breaker (a data command
-// was refused) reports down without a call.
+// One Redis data command per instance per 5 minutes at most (uptime monitors check every
+// minute); an open breaker reports down without a call.
 const REDIS_PROBE_TTL_MS = 5 * 60_000;
 let redisProbe: { at: number; result: Promise<void> } | null = null;
 export function cachedRedisProbe(env: Readonly<Record<string, string | undefined>> = process.env, now = Date.now()): Promise<void> {
@@ -140,4 +144,15 @@ export function cachedProviderProbe(name: ProviderName, env: Readonly<Record<str
   result.catch(() => undefined);
   providerCache.set(name, { at: Date.now(), result });
   return result;
+}
+
+/**
+ * What this instance knows about the shared store right now (review R-08):
+ * 'shared' (configured, no recent failure), 'unavailable' (configured, but the
+ * breaker is open: quota, auth, outage or an invalid reply), 'not-configured'.
+ */
+export function redisAvailability(env: Readonly<Record<string, string | undefined>> = process.env): { state: 'shared' | 'unavailable' | 'not-configured'; kind: RedisFailureKind | null } {
+  if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) return { state: 'not-configured', kind: null };
+  const breaker = redisBreakerState();
+  return breaker.open ? { state: 'unavailable', kind: breaker.kind } : { state: 'shared', kind: null };
 }

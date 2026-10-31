@@ -61,7 +61,6 @@ export async function POST(req: Request) {
     limit: 5,
     windowMs: 60_000,
     bucket: "newsletter",
-    localFallback: true,
   });
   if (!shared.available) return rateLimitUnavailable(shared);
   if (!shared.ok) return tooMany(shared);

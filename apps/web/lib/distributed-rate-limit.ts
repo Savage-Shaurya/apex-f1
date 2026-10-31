@@ -1,16 +1,17 @@
 import { scopedRedisKey } from '../../../packages/api-client/src/redis-scope';
-import { guardedRedisFetch } from '../../../packages/api-client/src/redis-guard';
+import { guardedRedisFetch, invalidRedisReply, redisDeadlineReason, redisFailureOf } from '../../../packages/api-client/src/redis-guard';
 import { rateLimit, rateLimitSubject, type RateLimitOptions, type RateLimitResult } from './rate-limit';
 
 export interface SharedRateLimitOptions extends RateLimitOptions {
-  /** Retained for existing callers; every bucket now falls back to the in-memory limiter (below). */
-  localFallback?: boolean;
   /**
-   * Refuse (503) instead of falling back when the shared store is missing or
-   * failing. For administrator authentication, whose sessions live in Redis
-   * anyway: without Redis nobody can sign in, so nothing is lost by refusing.
+   * A read (GET): while the shared store is missing or failing, keep it
+   * available under this instance's in-memory limit (same numbers). Without
+   * it the bucket refuses with 503 "try again later" (owner decision
+   * 2026-10-31, review R-03): every public write (newsletter, predictions,
+   * identity setup, articles, image generation) and administrator
+   * authentication stay closed while Redis is unavailable.
    */
-  failClosed?: boolean;
+  readFallback?: boolean;
 }
 
 export interface SharedRateLimitResult extends RateLimitResult {
@@ -75,18 +76,17 @@ function sharedConfig(): { url: string; token: string } | null {
 
 /**
  * Redis is optional (2026-10-31). When the shared store is missing or failing
- * (quota, auth, outage, malformed reply), every bucket keeps a limit: this
- * instance's in-memory fixed window with the same limit and window. Reads
- * therefore stay open, and writes (newsletter, predictions, articles, image
- * generation) stay limited, never unlimited. Only `failClosed` buckets
- * (administrator authentication) answer 503 instead.
+ * (quota, auth, outage, malformed reply): reads (`readFallback`) keep this
+ * instance's in-memory window with the same limit; every other bucket (public
+ * writes, administrator authentication) answers 503 "try again later".
+ * Undeployed local development keeps the coarse brake for all buckets.
  */
 function undeployedDevelopment(): boolean {
   return process.env.NODE_ENV === 'development' && !process.env.VERCEL && !process.env.VERCEL_ENV;
 }
 
 function unavailable(req: Request, opts: SharedRateLimitOptions): SharedRateLimitResult {
-  if (!opts.failClosed || undeployedDevelopment()) {
+  if (opts.readFallback || undeployedDevelopment()) {
     return { ...rateLimit(req, opts), available: true, store: 'local' };
   }
   return {
@@ -149,8 +149,8 @@ async function readResult(response: Response, opts: RateLimitOptions, signal: Ab
  * Global fixed-window quota using the Upstash Redis REST API and atomic EVAL.
  * No network/config/error details are logged or returned. The full HTTP/body
  * operation is bounded to 3 seconds and redirects cannot forward credentials.
- * Missing/broken shared storage falls back to the in-memory limiter (see
- * `unavailable`), except for `failClosed` buckets, which answer 503.
+ * Missing/broken shared storage: reads fall back to the in-memory limiter,
+ * everything else answers 503 (see `unavailable`).
  */
 export async function rateLimitShared(req: Request, opts: SharedRateLimitOptions): Promise<SharedRateLimitResult> {
   validateOptions(opts);
@@ -159,9 +159,11 @@ export async function rateLimitShared(req: Request, opts: SharedRateLimitOptions
 
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
   const deadline = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
-      controller.abort();
+      timedOut = true;
+      controller.abort(redisDeadlineReason());
       reject(new Error('Rate limit store timed out'));
     }, TIMEOUT_MS);
   });
@@ -191,7 +193,10 @@ export async function rateLimitShared(req: Request, opts: SharedRateLimitOptions
       available: true,
       store: 'upstash',
     };
-  } catch {
+  } catch (error) {
+    // A reply our script cannot have produced is our bug: loud, and the breaker
+    // stops it costing a command per request (review R-06).
+    if (!timedOut && !redisFailureOf(error)) invalidRedisReply('rate-limit');
     return unavailable(req, opts);
   } finally {
     clearTimeout(timer);
@@ -202,7 +207,7 @@ export async function rateLimitShared(req: Request, opts: SharedRateLimitOptions
 
 /** A storage outage is 503; genuine shared/local quota exhaustion remains 429. */
 export function rateLimitUnavailable(result: SharedRateLimitResult): Response {
-  return new Response(JSON.stringify({ ok: false, error: 'rate limiter unavailable' }), {
+  return new Response(JSON.stringify({ ok: false, error: 'Temporarily unavailable. Please try again later.' }), {
     status: 503,
     headers: {
       'content-type': 'application/json',

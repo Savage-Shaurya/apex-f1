@@ -16,7 +16,7 @@ function originGuard(req: Request): Response | null {
 export async function loginAdmin(req: Request): Promise<Response> {
   const guard = originGuard(req); if (guard) return guard;
   try {
-    const quota = await rateLimitShared(req, { limit: 20, windowMs: 300_000, bucket: 'admin-login-network', failClosed: true });
+    const quota = await rateLimitShared(req, { limit: 20, windowMs: 300_000, bucket: 'admin-login-network' });
     if (!quota.available) return unavailable();
     if (!quota.ok) return json({ ok: false, error: 'Too many login attempts.' }, 429, { 'Retry-After': String(quota.retryAfter) });
     const config = adminSessionConfiguration();
@@ -39,7 +39,7 @@ export async function loginAdmin(req: Request): Promise<Response> {
 export async function logoutAdmin(req: Request): Promise<Response> {
   const guard = originGuard(req); if (guard) return guard;
   try {
-    const quota = await rateLimitShared(req, { limit: 30, windowMs: 60_000, bucket: 'admin-logout-network', failClosed: true });
+    const quota = await rateLimitShared(req, { limit: 30, windowMs: 60_000, bucket: 'admin-logout-network' });
     if (!quota.available) return unavailable();
     if (!quota.ok) return json({ ok: false, error: 'Too many logout attempts.' }, 429, { 'Retry-After': String(quota.retryAfter) });
     const body = await readJsonObject(req, 64);

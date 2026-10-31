@@ -13,7 +13,6 @@ The deployment also requires:
 | `ADMIN_SESSION_SECRET` | At least 32 cryptographically random bytes encoded as canonical unpadded base64url; 43 characters for 32 bytes. |
 | `ADMIN_MFA_SECRETS_JSON` | JSON object mapping every configured username to a different random 20-byte secret encoded as exactly 32 uppercase unpadded Base32 characters. |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | The shared authoritative Redis connection. |
-| `DISTRIBUTED_RATE_LIMIT_REQUIRED` | `true`. |
 
 `scripts/admin-mfa-provision.mjs` reads the named profile array from stdin and writes these authentication fields to a **new absolute file outside the repository** ending in `.private.json`. It refuses overwrite and prints no secret material. The file is owner-only on Unix. On Windows, first use a private output folder owned by the current account, with protected inheritance and Allow permissions restricted to that account and SYSTEM; the CLI verifies this before creating the file, then also removes file inheritance before writing. This prevents a reader obtaining a file handle while an initially public file is empty. Supply its private values through your hosting provider's secret manager; do not add this file to the release artifact.
 

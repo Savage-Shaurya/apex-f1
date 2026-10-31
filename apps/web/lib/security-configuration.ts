@@ -28,8 +28,8 @@ export function inspectProductionSecurityConfiguration(environment: Record<strin
   strong('CRON_SECRET'); strong('PREDICTION_COOKIE_SECRET');
   if (!environment.ADMIN_USERS_JSON) error('ADMIN_USERS_JSON', 'missing-admin', 'Configure individually scoped administrator credentials with second factors.');
   if (environment.ADMIN_PASSWORD) { strong('ADMIN_PASSWORD'); error('ADMIN_PASSWORD', 'legacy-admin-disabled', 'Remove the legacy password-only owner credential from production.'); }
-  try { adminSessionConfiguration(environment); }
-  catch { error('ADMIN_SESSION_SECRET', 'invalid-admin-session', 'Configure a private random base64url session secret, shared Redis and a unique 32-character Base32 second factor for every named administrator.'); }
+  try { adminSessionConfiguration(environment, { requireStore: false }); }
+  catch { error('ADMIN_SESSION_SECRET', 'invalid-admin-session', 'Configure a private random base64url session secret and a unique 32-character Base32 second factor for every named administrator (sign-in also needs the shared Redis store at runtime).'); }
   if (environment.ADMIN_USERS_JSON) {
     try {
       const users = configuredAdminUsers(environment);
@@ -39,13 +39,22 @@ export function inspectProductionSecurityConfiguration(environment: Record<strin
     } catch { error('ADMIN_USERS_JSON', 'invalid-admin', 'Use bounded unique usernames, fixed-format scrypt hashes and explicit supported capabilities.'); }
   }
   if (environment.ADMIN_LOCAL_DEV_BYPASS === 'true') error('ADMIN_LOCAL_DEV_BYPASS', 'development-bypass', 'Remove the development bypass from release configuration.');
-  if (environment.DISTRIBUTED_RATE_LIMIT_REQUIRED !== 'true') error('DISTRIBUTED_RATE_LIMIT_REQUIRED', 'shared-store-required', 'Set the explicit shared quota requirement to true for release.');
-  try {
-    const url = new URL(environment.UPSTASH_REDIS_REST_URL ?? '');
-    if (url.protocol !== 'https:' || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.upstash\.io$/.test(url.hostname) || url.username || url.password || url.port || url.pathname !== '/' || url.search || url.hash) throw new Error();
-  } catch { error('UPSTASH_REDIS_REST_URL', 'invalid-store-origin', 'Configure the canonical HTTPS Upstash REST origin.'); }
+  // Redis is optional (2026-10-31, review R-01): a missing or malformed Upstash
+  // configuration is a startup WARNING, never a refusal to start. Without it,
+  // reads use per-instance limits, public writes and administrator sign-in
+  // answer 503 "try again later" (distributed-rate-limit.ts).
+  const warning = (field: string, code: string, message: string) => issues.push({ field, code, severity: 'warning' as const, message });
+  const storeUrl = environment.UPSTASH_REDIS_REST_URL;
   const redisToken = environment.UPSTASH_REDIS_REST_TOKEN;
-  if (!redisToken || redisToken.length > 4_096 || !/^[a-zA-Z0-9._~+/-]+={0,2}$/.test(redisToken)) error('UPSTASH_REDIS_REST_TOKEN', 'invalid-store-token', 'Configure the private Redis REST token.');
+  if (!storeUrl && !redisToken) {
+    warning('UPSTASH_REDIS_REST_URL', 'shared-store-missing', 'No shared store: public writes and administrator sign-in answer 503 until Upstash is configured.');
+  } else {
+    try {
+      const url = new URL(storeUrl ?? '');
+      if (url.protocol !== 'https:' || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.upstash\.io$/.test(url.hostname) || url.username || url.password || url.port || url.pathname !== '/' || url.search || url.hash) throw new Error();
+    } catch { warning('UPSTASH_REDIS_REST_URL', 'invalid-store-origin', 'Configure the canonical HTTPS Upstash REST origin; until then public writes and administrator sign-in answer 503.'); }
+    if (!redisToken || redisToken.length > 4_096 || !/^[a-zA-Z0-9._~+/-]+={0,2}$/.test(redisToken)) warning('UPSTASH_REDIS_REST_TOKEN', 'invalid-store-token', 'Configure the private Redis REST token; until then public writes and administrator sign-in answer 503.');
+  }
   const databaseIdentity = (field: string): string | null => {
     try {
       const url = new URL(environment[field] ?? '');

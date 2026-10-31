@@ -4,20 +4,22 @@ import { resetRedisBreakers } from '../../../packages/api-client/src/redis-guard
 import { rateLimitShared, rateLimitUnavailable } from '../lib/distributed-rate-limit';
 import { tooMany, type RateLimitOptions } from '../lib/rate-limit';
 
-const ENV_KEYS = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'DISTRIBUTED_RATE_LIMIT_REQUIRED'] as const;
+const ENV_KEYS = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'] as const;
 const originalEnv = new Map(ENV_KEYS.map((key) => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 const originalNow = Date.now;
 const OPTIONS = { limit: 5, windowMs: 60_000, bucket: 'shared-test' };
-/** Administrator-style bucket: refuses (503) instead of the in-memory fallback (Redis optional, 2026-10-31). */
-const CLOSED = { ...OPTIONS, failClosed: true };
+/** Writes and admin (the default) refuse with 503 while Redis is unavailable (owner decision R-03, 2026-10-31). */
+const CLOSED = OPTIONS;
+/** Reads keep the in-memory limit while Redis is unavailable. */
+const READ = { ...OPTIONS, readFallback: true };
 const TOKEN = 'synthetic-upstash-token';
 
 beforeEach(() => {
   Object.assign(process.env, {
     NODE_ENV: 'production', VERCEL: '1', VERCEL_ENV: 'production',
     UPSTASH_REDIS_REST_URL: 'https://synthetic-store.upstash.io',
-    UPSTASH_REDIS_REST_TOKEN: TOKEN, DISTRIBUTED_RATE_LIMIT_REQUIRED: 'true',
+    UPSTASH_REDIS_REST_TOKEN: TOKEN,
   });
   resetRedisBreakers();
   // Every test owns its HTTP fixture. An accidental real request fails loudly.
@@ -134,38 +136,38 @@ test('untrusted proxy headers cannot manufacture separate quotas outside Vercel'
   assert.equal(results.filter((result) => result.ok).length, 5);
 });
 
-// Redis is optional (incident 2026-10-31): the shared store missing or failing never
-// removes a limit. Every bucket keeps this instance's in-memory window (same limit);
-// only failClosed buckets (administrator authentication) refuse with 503.
-test('missing shared config: every deployment keeps an in-memory limit; failClosed buckets refuse', async () => {
+// Redis is optional (incident 2026-10-31; owner decision on review R-03): while the shared
+// store is missing or failing, reads keep this instance's in-memory window (same limit,
+// never unlimited) and every write or admin bucket refuses with 503 "try again later".
+test('missing shared config: reads keep an in-memory limit; writes and admin refuse with 503', async () => {
   let calls = 0;
   globalThis.fetch = async () => { calls += 1; throw new Error('must not fetch'); };
-  for (const required of [undefined, 'false', 'true']) {
-    if (required === undefined) delete process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED;
-    else process.env.DISTRIBUTED_RATE_LIMIT_REQUIRED = required;
+  for (const required of ['once'] as const) {
     for (const deployment of ['production', 'preview']) {
       process.env.VERCEL_ENV = deployment;
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
-      const opts = { ...OPTIONS, limit: 1, bucket: `noconf-${deployment}-${required ?? 'unset'}` };
+      const opts = { ...READ, limit: 1, bucket: `noconf-${deployment}-${required}` };
       const allowed = await rateLimitShared(request(), opts);
       const denied = await rateLimitShared(request(), opts);
       assert.equal(allowed.store, 'local'); assert.equal(allowed.ok, true); assert.equal(allowed.available, true);
       assert.equal(denied.ok, false, 'never unlimited');
-      const closed = await rateLimitShared(request(), { ...CLOSED, bucket: `noconf-closed-${deployment}` });
-      assert.equal(closed.available, false);
-      assert.equal(closed.store, 'unavailable');
-      assert.equal(rateLimitUnavailable(closed).status, 503);
+      const write = await rateLimitShared(request(), { ...CLOSED, bucket: `noconf-write-${deployment}` });
+      assert.equal(write.available, false);
+      assert.equal(write.store, 'unavailable');
+      const response = rateLimitUnavailable(write);
+      assert.equal(response.status, 503);
+      assert.match((await response.json()).error, /try again later/i);
     }
   }
   assert.equal(calls, 0);
 });
 
-test('undeployed local development keeps the coarse brake for every bucket, including failClosed ones', async () => {
+test('undeployed local development keeps the coarse brake for every bucket, reads and writes', async () => {
   Object.assign(process.env, { NODE_ENV: 'development' });
   delete process.env.VERCEL;
   delete process.env.VERCEL_ENV;
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
-  for (const opts of [{ ...OPTIONS, limit: 1, bucket: 'dev-open' }, { ...CLOSED, limit: 1, bucket: 'dev-closed' }]) {
+  for (const opts of [{ ...READ, limit: 1, bucket: 'dev-read' }, { ...CLOSED, limit: 1, bucket: 'dev-write' }]) {
     const allowed = await rateLimitShared(request(), opts);
     const denied = await rateLimitShared(request(), opts);
     assert.equal(allowed.store, 'local'); assert.equal(allowed.ok, true);
@@ -173,24 +175,28 @@ test('undeployed local development keeps the coarse brake for every bucket, incl
   }
 });
 
-test('a configured shared store that errors falls back to the in-memory limit (never unlimited); failClosed refuses', async () => {
-  for (const reply of [
-    async () => { throw new Error('synthetic quota outage'); },
-    async () => new Response('{}', { status: 503 }),
-    async () => Response.json({ result: [1, 0] }),
-    async () => new Response(JSON.stringify({ error: 'ERR max requests limit exceeded. Limit: 500000, Usage: 500002' }), { status: 400 }),
-  ]) {
-    resetRedisBreakers();
-    globalThis.fetch = reply;
-    const opts = { ...OPTIONS, limit: 2, bucket: `errors-${Math.random().toString(36).slice(2)}` };
-    const results = [];
-    for (let i = 0; i < 3; i++) results.push(await rateLimitShared(request(), opts));
-    assert.deepEqual(results.map((r) => [r.store, r.ok]), [['local', true], ['local', true], ['local', false]]);
-    const closed = await rateLimitShared(request(), CLOSED);
-    assert.equal(closed.available, false);
-    assert.equal(closed.ok, false);
-    assert.equal(rateLimitUnavailable(closed).status, 503);
-  }
+test('a configured shared store that errors: reads use the in-memory limit (never unlimited); writes refuse with 503', async () => {
+  const errors = console.error;
+  console.error = () => {};
+  try {
+    for (const reply of [
+      async () => { throw new Error('synthetic quota outage'); },
+      async () => new Response('{}', { status: 503 }),
+      async () => Response.json({ result: [1, 0] }),
+      async () => new Response(JSON.stringify({ error: 'ERR max requests limit exceeded. Limit: 500000, Usage: 500002' }), { status: 400 }),
+    ]) {
+      resetRedisBreakers();
+      globalThis.fetch = reply;
+      const opts = { ...READ, limit: 2, bucket: `errors-${Math.random().toString(36).slice(2)}` };
+      const results = [];
+      for (let i = 0; i < 3; i++) results.push(await rateLimitShared(request(), opts));
+      assert.deepEqual(results.map((r) => [r.store, r.ok]), [['local', true], ['local', true], ['local', false]]);
+      const write = await rateLimitShared(request(), CLOSED);
+      assert.equal(write.available, false);
+      assert.equal(write.ok, false);
+      assert.equal(rateLimitUnavailable(write).status, 503);
+    }
+  } finally { console.error = errors; }
 });
 
 test('insecure URLs, private hosts, credentials, misleading domains and command paths never receive the token', async () => {
@@ -223,7 +229,9 @@ test('missing or malformed bearer tokens are rejected before HTTP', async () => 
   assert.equal(calls, 0);
 });
 
-test('HTTP errors, store errors, broken JSON and invalid quota replies never become successful requests', async () => {
+test('HTTP errors, store errors, broken JSON and invalid quota replies never become successful requests', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  t.mock.method(console, 'warn', () => {});
   const fixtures = [
     () => new Response('{}', { status: 401 }),
     () => new Response('{}', { status: 429 }),
@@ -312,7 +320,7 @@ test('quota exhaustion returns standard 429 headers; store failure is a generic 
   assert.equal(unavailable.status, 503);
   assert.equal(unavailable.headers.get('retry-after'), '30');
   assert.equal(unavailable.headers.get('cache-control'), 'no-store');
-  assert.deepEqual(await unavailable.json(), { ok: false, error: 'rate limiter unavailable' });
+  assert.deepEqual(await unavailable.json(), { ok: false, error: 'Temporarily unavailable. Please try again later.' });
 });
 
 test('a subject-keyed limit counts one identity across IPs and never exposes the raw subject', async () => {

@@ -10,6 +10,7 @@ import {
   REDIS_BREAKER_MS,
   RedisUnavailableError,
   guardedRedisFetch,
+  invalidRedisReply,
   redisBreakerOpen,
   redisBreakerState,
   redisCommandStats,
@@ -18,7 +19,7 @@ import {
   setRedisBreakerClock,
 } from './redis-guard';
 import { classifyProviderFailure, isProviderUnavailable } from './transport';
-import { REDIS_FAILURES } from './redis-failure-fixtures';
+import { REDIS_FAILURES, UPSTASH_QUOTA_BODY } from './redis-failure-fixtures';
 
 
 
@@ -116,4 +117,87 @@ test('commands are counted per consumer (pipelines count every command)', async 
   const stats = redisCommandStats();
   assert.equal(stats.commands, 4);
   assert.equal(stats.byConsumer['jolpica-admission'], 4);
+});
+
+// ---------- Independent review (docs/audit/2026-10-31/redis-review.md) ----------
+
+/** A healthy Upstash that answers after 50 ms and honours abort, like undici. */
+function slowHealthy(calls: { n: number }) {
+  return (async (_input: unknown, init?: RequestInit) => {
+    calls.n += 1;
+    return await new Promise<Response>((resolve, reject) => {
+      const timer = setTimeout(() => resolve(Response.json({ result: 'OK' })), 50);
+      init?.signal?.addEventListener('abort', () => { clearTimeout(timer); reject(init.signal?.reason ?? new DOMException('aborted', 'AbortError')); }, { once: true });
+    });
+  }) as typeof fetch;
+}
+
+test('R-02 (E1): caller aborts (client disconnects) against a healthy Redis never open the breaker', async () => {
+  setRedisBreakerClock(null);
+  const calls = { n: 0 };
+  const impl = slowHealthy(calls);
+  const guarded = guardedRedisFetch('admin-session', impl);
+  for (let i = 0; i < 5; i++) {
+    const caller = new AbortController();
+    const pending = guarded('https://x.upstash.io', { method: 'POST', body: '["PING"]', signal: caller.signal });
+    setTimeout(() => caller.abort(), 5);
+    await assert.rejects(pending, (error: unknown) => !(error instanceof RedisUnavailableError));
+  }
+  assert.equal(redisBreakerOpen(impl), false);
+  const before = calls.n;
+  assert.equal((await guardedRedisFetch('rate-limit', impl)('https://x.upstash.io', { method: 'POST', body: '["PING"]' })).status, 200);
+  assert.equal(calls.n, before + 1, 'the next request reached Redis');
+});
+
+test('R-02: our own Redis deadline (TimeoutError reason) still counts as a transient failure', async () => {
+  setRedisBreakerClock(null);
+  const impl = slowHealthy({ n: 0 });
+  const guarded = guardedRedisFetch('rate-limit', impl);
+  for (let i = 0; i < 2; i++) {
+    const deadline = new AbortController();
+    const pending = guarded('https://x.upstash.io', { method: 'POST', body: '["PING"]', signal: deadline.signal });
+    setTimeout(() => deadline.abort(new DOMException('Redis deadline', 'TimeoutError')), 5);
+    await assert.rejects(pending, (error: unknown) => error instanceof RedisUnavailableError);
+  }
+  assert.equal(redisBreakerOpen(impl), true);
+});
+
+test('R-04 (E2): half-open: after the window exactly one of 25 concurrent calls probes Redis; success closes it', async () => {
+  let quota = true;
+  const calls = { n: 0 };
+  const impl = (async () => {
+    calls.n += 1;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return quota ? new Response(UPSTASH_QUOTA_BODY, { status: 400 }) : Response.json({ result: 'OK' });
+  }) as typeof fetch;
+  const guarded = guardedRedisFetch('x', impl);
+  const send1 = () => guarded('https://x.upstash.io', { method: 'POST', body: '["GET","k"]' });
+  await assert.rejects(send1());
+  clock += REDIS_BREAKER_MS['redis-quota'] + 1;
+  await Promise.allSettled(Array.from({ length: 25 }, send1));
+  assert.equal(calls.n, 2, 'one probe while still over quota');
+  assert.equal(redisBreakerOpen(impl), true, 'a failed probe re-opens the breaker');
+  clock += REDIS_BREAKER_MS['redis-quota'] + 1;
+  quota = false;
+  const results = await Promise.allSettled(Array.from({ length: 25 }, send1));
+  assert.equal(calls.n, 3, 'one probe after recovery');
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+  assert.equal(redisBreakerOpen(impl), false, 'a successful probe closes it');
+  assert.equal((await send1()).status, 200);
+  assert.equal(calls.n, 4);
+});
+
+test('R-06: an invalid script reply is reported loudly once per trip and opens the breaker', async () => {
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (line: unknown) => { errors.push(String(line)); };
+  try {
+    const { impl } = counting(async () => Response.json({ result: 'OK' }));
+    const first = invalidRedisReply('jolpica-admission', impl);
+    invalidRedisReply('jolpica-admission', impl);
+    assert.equal(first.kind, 'redis-invalid-reply');
+    assert.equal(redisBreakerState(impl).kind, 'redis-invalid-reply');
+    assert.equal(errors.length, 1);
+    assert.deepEqual(JSON.parse(errors[0]!), { event: 'redis.breaker.open', kind: 'redis-invalid-reply', consumer: 'jolpica-admission', status: null, retryInMs: REDIS_BREAKER_MS['redis-invalid-reply'] });
+  } finally { console.error = originalError; }
 });

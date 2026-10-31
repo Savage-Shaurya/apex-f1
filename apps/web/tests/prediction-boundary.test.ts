@@ -3,7 +3,7 @@ import { afterEach, beforeEach, test } from 'node:test';
 import { GET, POST } from '../app/api/predict/route';
 import { createPredictionIdentity } from '@apex/db';
 
-const keys = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'DISTRIBUTED_RATE_LIMIT_REQUIRED', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'PREDICTION_COOKIE_SECRET', 'DATABASE_URL'] as const;
+const keys = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'PREDICTION_COOKIE_SECRET', 'DATABASE_URL'] as const;
 const originalEnv = new Map(keys.map(key => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 let quotaCalls = 0;

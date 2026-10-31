@@ -22,7 +22,7 @@ const liveProcess = globalThis as typeof globalThis & {
 };
 
 export async function GET(request: Request) {
-  const limit = await rateLimitShared(request, { limit: NEW_CONNECTION_LIMIT, windowMs: 60_000, bucket: 'live-stream-open' });
+  const limit = await rateLimitShared(request, { limit: NEW_CONNECTION_LIMIT, windowMs: 60_000, bucket: 'live-stream-open', readFallback: true });
   if (!limit.available) return rateLimitUnavailable(limit);
   if (!limit.ok) return tooMany(limit);
   const hub = liveProcess.__apexLiveSessionHubV3 ??= createConfiguredLiveSessionHub({ source: openf1, access: getOpenF1AccessConfig }) ?? undefined;

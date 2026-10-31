@@ -53,7 +53,7 @@ export async function GET(req: Request): Promise<Response> {
   if (!secret) return fail('Predictions are temporarily unavailable.', 503);
   const identity = requestIdentity(req, secret);
   if (typeof identity !== 'string') return identity;
-  const quota = await rateLimitShared(req, { limit: 120, windowMs: 60_000, bucket: 'predict-read' });
+  const quota = await rateLimitShared(req, { limit: 120, windowMs: 60_000, bucket: 'predict-read', readFallback: true });
   if (!quota.available) return privateResponse(rateLimitUnavailable(quota));
   if (!quota.ok) return privateResponse(tooMany(quota));
   const params = new URL(req.url).searchParams;
@@ -77,7 +77,7 @@ export async function GET(req: Request): Promise<Response> {
 export async function POST(req: Request): Promise<Response> {
   const guard = validateJsonMutationRequest(req);
   if (guard) return privateResponse(guard);
-  const quota = await rateLimitShared(req, { limit: 20, windowMs: 60_000, bucket: 'predict', localFallback: true });
+  const quota = await rateLimitShared(req, { limit: 20, windowMs: 60_000, bucket: 'predict' });
   if (!quota.available) return privateResponse(rateLimitUnavailable(quota));
   if (!quota.ok) return privateResponse(tooMany(quota));
   const secret = configuredSecret();
@@ -104,7 +104,7 @@ export async function POST(req: Request): Promise<Response> {
   if (typeof identity !== 'string') return identity;
   // Per-identity brake on top of the per-IP one: fresh attempt ids cannot turn
   // one session into an unbounded stream of race verifications.
-  const identityQuota = await rateLimitShared(req, { limit: 30, windowMs: 3_600_000, bucket: 'predict-identity', subject: identity, localFallback: true });
+  const identityQuota = await rateLimitShared(req, { limit: 30, windowMs: 3_600_000, bucket: 'predict-identity', subject: identity });
   if (!identityQuota.available) return privateResponse(rateLimitUnavailable(identityQuota));
   if (!identityQuota.ok) return privateResponse(tooMany(identityQuota));
   const attemptId = req.headers.get('x-apex-prediction-attempt');

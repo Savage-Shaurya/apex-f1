@@ -183,7 +183,7 @@ export async function authorizeAdminRequest(req: Request, capability?: AdminCapa
   }
   if (!adminAuthenticationConfigured()) return { principal: null, response: options.hideWhenUnconfigured
     ? privateAdminResponse(new Response('Not Found', { status: 404 })) : adminUnauthorized() };
-  const quota = await rateLimitShared(req, { limit: 120, windowMs: 60_000, bucket: `admin-auth-${options.boundary ?? 'handler'}`, failClosed: true });
+  const quota = await rateLimitShared(req, { limit: 120, windowMs: 60_000, bucket: `admin-auth-${options.boundary ?? 'handler'}` });
   if (!quota.available) return { principal: null, response: privateAdminResponse(rateLimitUnavailable(quota)) };
   if (!quota.ok) return { principal: null, response: privateAdminResponse(tooMany(quota)) };
   try {

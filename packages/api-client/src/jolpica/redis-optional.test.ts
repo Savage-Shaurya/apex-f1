@@ -114,3 +114,17 @@ test('command budget: 100 page reads of one key on a warm instance cost ≤ 3 Re
   await new Promise((resolve) => setImmediate(resolve));
   assert.ok(redis.commands.length <= 3, `${redis.commands.length} commands`);
 });
+
+test('R-06: a malformed admission reply is our bug: logged once at error level, breaker open, reads stay local (1 command for 10 reads)', async () => {
+  const errors: string[] = [];
+  const originalError = console.error;
+  console.error = (line: unknown) => { errors.push(String(line)); };
+  const commands: string[][] = [];
+  const impl = (async (_input: unknown, init?: RequestInit) => { commands.push(JSON.parse(String(init?.body))); return Response.json({ result: [7, 7, 7] }); }) as typeof fetch;
+  try {
+    const reads = new JolpicaRequestControl({ sharedAdmission: createJolpicaSharedAdmission(CONFIG, { fetch: impl, env: ENV }), buildPhase: () => false });
+    for (let i = 0; i < 10; i++) assert.deepEqual(await reads.readThrough(`${schedule}&i=${i}`, 300, { timeoutMs: 6_000 }, async () => ({ ok: i })), { ok: i });
+  } finally { console.error = originalError; }
+  assert.equal(commands.length, 1);
+  assert.equal(errors.filter((line) => line.includes('redis-invalid-reply')).length, 1);
+});

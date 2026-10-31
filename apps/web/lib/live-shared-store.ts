@@ -1,5 +1,5 @@
 import { scopedRedisKey } from '../../../packages/api-client/src/redis-scope';
-import { guardedRedisFetch, redisFailureOf, RedisUnavailableError } from '../../../packages/api-client/src/redis-guard';
+import { guardedRedisFetch, redisDeadlineReason, redisFailureOf, RedisUnavailableError } from '../../../packages/api-client/src/redis-guard';
 import { MAX_LIVE_SNAPSHOT_BYTES, sanitizeLiveFrames } from './live-frame-schema';
 import type { LiveFrame } from './live-session-hub';
 import { randomUUID } from 'node:crypto';
@@ -118,9 +118,10 @@ export function createUpstashRedisTransport(config: LiveStoreConfig, options: { 
     const deadline = new Promise<never>((_resolve, reject) => {
       interrupt = reject;
       // A store that does not answer in time is unavailable Redis, not our bug (redis-guard.ts).
-      timer = setTimeout(() => { controller.abort(); reject(new RedisUnavailableError('redis-unavailable', 'live-store')); }, timeoutMs);
+      timer = setTimeout(() => { controller.abort(redisDeadlineReason()); reject(new RedisUnavailableError('redis-unavailable', 'live-store')); }, timeoutMs);
     });
-    const abort = () => { controller.abort(signal.reason); interrupt(new Error('Live shared store unavailable')); };
+    // The caller's cancellation (client disconnect, page deadline) is never a Redis failure (R-02).
+    const abort = () => { controller.abort(new DOMException('Caller cancelled', 'AbortError')); interrupt(new Error('Live shared store unavailable')); };
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
     // Opaque causal tokens cannot be compared. Serialize commands, including

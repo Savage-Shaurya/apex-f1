@@ -25,7 +25,7 @@ export async function GET(req: Request) {
     if (!/^\d{1,2}$/.test(rawLimit) || Number(rawLimit) < 1 || Number(rawLimit) > 50) throw new InputError('Article page size must be between 1 and 50.');
     limit = Number(rawLimit);
   } catch (error) { return errorResponse(error); }
-  const quota = await rateLimitShared(req, { limit: 60, windowMs: 60_000, bucket: 'articles-read', localFallback: true });
+  const quota = await rateLimitShared(req, { limit: 60, windowMs: 60_000, bucket: 'articles-read', readFallback: true });
   if (!quota.available) return rateLimitUnavailable(quota);
   if (!quota.ok) return tooMany(quota);
   try {

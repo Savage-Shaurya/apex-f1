@@ -19,7 +19,7 @@ import { PARTIAL_ON_BUDGET_HEADER, runLeasedCron } from '@/lib/leased-cron';
 import { buildReport, logReport } from '@/lib/cron-auth';
 import { calendarReport, providerUnavailableResponse, readCronCalendar, unavailableProvider, type CronCalendar } from '@/lib/cron-outcome';
 import { weekendWatchTargets } from '@/lib/data-freshness';
-import { pathsFor, redisFingerprintStore, runWeekendWatch, type WatchRace } from '@/lib/weekend-watch';
+import { layeredFingerprintStore, pathsFor, redisFingerprintStore, runWeekendWatch, type WatchRace } from '@/lib/weekend-watch';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,7 +54,8 @@ export async function GET(request: Request) {
     const result = await runWeekendWatch({
       now,
       races,
-      store: redis ? redisFingerprintStore(redis) : null,
+      // Process memory behind Redis (review R-07): Redis down never means a purge every run.
+      store: layeredFingerprintStore(redis ? redisFingerprintStore(redis) : null),
       hasTime: () => job.remainingMs() > 12_000,
       read: async (target) => {
         // Uncached and strict: a failure is an error, never "not published".

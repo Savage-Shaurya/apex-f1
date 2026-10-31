@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server';
 import { createPredictionIdentity, readPredictionIdentity } from '@apex/db';
 import { GET, POST } from '../app/api/predict/identity/route';
 
-const keys = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'DISTRIBUTED_RATE_LIMIT_REQUIRED', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'PREDICTION_COOKIE_SECRET', 'DATABASE_URL'] as const;
+const keys = ['NODE_ENV', 'VERCEL', 'VERCEL_ENV', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'PREDICTION_COOKIE_SECRET', 'DATABASE_URL'] as const;
 const originalEnv = new Map(keys.map((key) => [key, process.env[key]]));
 const originalFetch = globalThis.fetch;
 const secret = 'offline-prediction-identity-fixture-at-least-32-bytes';
@@ -93,18 +93,19 @@ test('bootstrap never signs a caller-selected identity or accepts a cross-origin
   assert.equal(quotaCalls, calls);
 });
 
-test('identity setup fails closed with missing configuration; an unavailable distributed quota keeps the in-memory limit', async () => {
+test('identity setup fails closed with missing configuration or unavailable distributed quota', async () => {
   delete process.env.DATABASE_URL;
   assert.equal((await POST(request('POST'))).status, 503);
   assert.equal((await GET(request('GET'))).status, 503);
   assert.equal(quotaCalls, 0);
   process.env.DATABASE_URL = 'postgres://offline-fixture.invalid/apex';
-  // Redis is optional (2026-10-31): the shared quota failing never removes the limit.
+  // Owner decision (review R-03): a public write refuses while Redis is unavailable.
   globalThis.fetch = async () => { throw new TypeError('offline'); };
-  const statuses: number[] = [];
-  for (let i = 0; i < 21; i++) statuses.push((await POST(request('POST'))).status);
-  assert.deepEqual(statuses.slice(0, 20), Array(20).fill(200));
-  assert.equal(statuses[20], 429, 'the 21st identity setup in one minute is refused locally');
+  for (let i = 0; i < 3; i++) {
+    const response = await POST(request('POST'));
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('set-cookie'), null);
+  }
 });
 
 test('identity setup bounds its JSON request body independently of prediction payloads', async () => {

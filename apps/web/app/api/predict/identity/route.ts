@@ -32,7 +32,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   if (!isSameOriginMutationRequest(req)) return fail('Cross-origin identity confirmation is not allowed.', 403);
   const secret = configuredSecret();
   if (!secret) return fail('Predictions are temporarily unavailable.', 503);
-  const quota = await rateLimitShared(req, { limit: 120, windowMs: 60_000, bucket: 'predict-identity-read' });
+  const quota = await rateLimitShared(req, { limit: 120, windowMs: 60_000, bucket: 'predict-identity-read', readFallback: true });
   if (!quota.available) return privateResponse(rateLimitUnavailable(quota));
   if (!quota.ok) return privateResponse(tooMany(quota));
   const identity = readPredictionIdentity(req.cookies.get(PREDICTION_COOKIE)?.value, secret);

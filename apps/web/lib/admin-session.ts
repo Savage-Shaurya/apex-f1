@@ -24,7 +24,8 @@ export function adminSessionCookieName(env: Environment = process.env): string {
 }
 
 /** Every named actor needs an independently provisioned second factor; legacy owners cannot log in. */
-export function adminSessionConfiguration(env: Environment = process.env): AdminSessionConfiguration {
+/** `requireStore: false` checks the credential shape only (startup: Redis is optional, review R-01). */
+export function adminSessionConfiguration(env: Environment = process.env, options: { requireStore?: boolean } = {}): AdminSessionConfiguration {
   const secret = env.ADMIN_SESSION_SECRET;
   if (!secret || !/^[A-Za-z0-9_-]{43,86}$/.test(secret) || Buffer.from(secret, 'base64url').length < 32 || Buffer.from(secret, 'base64url').toString('base64url') !== secret) throw new Error('Administrator sessions are unavailable');
   const users = configuredAdminUsers(env);
@@ -43,7 +44,7 @@ export function adminSessionConfiguration(env: Environment = process.env): Admin
     const fingerprint = createHmac('sha256', secret).update(JSON.stringify([user.username, user.passwordHash, [...user.capabilities].sort(), totpSecret])).digest('hex');
     return { ...user, capabilities: [...user.capabilities], totpSecret, fingerprint };
   });
-  if (!liveStoreConfig(env)) throw new Error('Administrator sessions are unavailable');
+  if (options.requireStore !== false && !liveStoreConfig(env)) throw new Error('Administrator sessions are unavailable');
   return { secret, actors };
 }
 
