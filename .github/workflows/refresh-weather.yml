@@ -14,7 +14,7 @@ name: Refresh race weather
 
 on:
   schedule:
-    - cron: "17 */6 * * *" # every 6 hours (owner, 2026-11-01)
+    - cron: "17 */3 * * *" # every 3 hours (owner, 2026-11-01)
   workflow_dispatch: {}
 
 concurrency:

@@ -16,7 +16,7 @@ name: Refresh videos
 
 on:
   schedule:
-    - cron: "41 */12 * * *" # every 12 hours (owner, 2026-11-01)
+    - cron: "41 */3 * * *" # every 3 hours (owner, 2026-11-01)
   workflow_dispatch: {}
 
 concurrency:

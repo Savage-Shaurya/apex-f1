@@ -19,8 +19,8 @@ name: Race weekend results watch
 
 on:
   schedule:
-    - cron: "4 * * * 5,6,0" # hourly, Friday to Sunday UTC (owner, 2026-11-01)
-    - cron: "4 0-6 * * 1" # hourly, Monday early hours (late races, corrections)
+    - cron: "4-49/15 * * * 5,6,0" # every 15 minutes, Friday to Sunday UTC (owner, 2026-11-01)
+    - cron: "4-49/15 0-6 * * 1" # every 15 minutes, Monday early hours (late races, corrections)
   workflow_dispatch: {}
 
 concurrency:
