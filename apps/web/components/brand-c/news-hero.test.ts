@@ -128,3 +128,11 @@ test('every hero photo fills the full-bleed frame, even on a 2x screen (no scale
   assert.ok(images.length >= 2);
   for (const image of images) assert.match(image, /\ballowUpscale\b/);
 });
+
+test('rotating stories never change the hero height: every story has an invisible, inert height holder', async () => {
+  // CI quality gate 2026-10-31: CLS 0.024 at 390 px as shorter and longer headlines swapped.
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('./NewsDesk.tsx', import.meta.url), 'utf8');
+  assert.match(source, /slides\.map\(\(story, i\) => \(\s*<div key=\{`hold-\$\{i\}`\} aria-hidden inert className="invisible[^"]*\[grid-area:1\/1\]"/);
+  assert.match(source, /aria-live=\{[^}]+\}[^>]*className="\[grid-area:1\/1\]"/);
+});

@@ -36,7 +36,11 @@ export const VARIANTS = {
   'cover-crop': { html: page({ main: '<img src="/pixel.png" alt="Car" style="width:300px;height:100px;object-fit:cover">' }), expect: ['image-crop'] },
   backdrop: { html: page({ main: '<div data-backdrop style="width:300px;height:100px"><img src="/pixel.png" alt="" style="width:300px;height:100px;object-fit:cover"></div>' }), expect: [] },
   console: { html: page({ script: '<script>console.error("boom: hydration failed")</script>' }), expect: ['console'] },
-  cls: { html: page({ main: '<p id="late-anchor">Standings table follows.</p><div style="height:600px">table</div>', script: '<script>setTimeout(()=>{const d=document.createElement("div");d.style.height="320px";d.textContent="late banner";document.querySelector("main").prepend(d)},1200)</script>' }), expect: ['cls'] },
+  // The late banner lands 1.2 s after load (phone emulation marks shifts in the first ~0.5 s as
+  // hadRecentInput, so they never count) and is inserted before the block in the middle of the viewport,
+  // so it shifts what is on screen wherever settle() has scrolled. Prepending to <main> flaked: the short
+  // page was sometimes already scrolled, the shift happened off screen and was not counted (2026-10-31).
+  cls: { html: page({ main: '<p id="late-anchor">Standings table follows.</p><div style="height:600px">table</div>', script: '<script>setTimeout(()=>{const d=document.createElement("div");d.style.height="320px";d.textContent="late banner";const t=document.elementFromPoint(innerWidth/2,innerHeight/2);(t&&t.closest("body > *")||document.querySelector("main")).before(d)},1200)</script>' }), expect: ['cls'] },
   'no-nav': { html: page({ header: '<div>No header here</div>' }), expect: ['nav'] },
   'no-give-back': { html: page({ header: '<header data-shell="nav"><a href="/" style="display:inline-flex;min-width:44px;min-height:44px">Apex</a><nav aria-label="Primary"><a href="/clean2" style="display:inline-flex;min-width:44px;min-height:44px">Results</a></nav></header>' }), expect: ['nav'] },
   // WCAG 2.5.8 inline exception: a link inside a sentence in a page header (not the site banner) is not a control.

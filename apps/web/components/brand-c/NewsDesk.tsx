@@ -62,6 +62,50 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
   const slide = slides[index]!;
   const next = stepSlide(index, 1, count);
 
+  // One story's copy. Rendered once visibly and once per story as an invisible, inert height
+  // holder, so the block is always as tall as the longest story: rotating stories never move
+  // the layout below (quality gate CLS on phones, 2026-10-31).
+  const storyBody = (story: HeroSlide) => (
+    <>
+  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.86rem] text-[color:var(--bc-silver)]">
+    <span className="font-semibold text-[color:var(--bc-white)]">{story.source}</span>
+    <span aria-hidden className="text-[color:var(--bc-titanium)]">·</span>
+    <RelativeTime ms={story.publishedMs} />
+  </p>
+  <h2 className="mt-3 text-[clamp(1.6rem,1.05rem+2.3vw,3.25rem)] font-semibold leading-[1.1] text-[color:var(--bc-white)] [text-wrap:balance]">
+    <a
+      href={story.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="decoration-[color:var(--bc-red)] decoration-2 underline-offset-[0.16em] hover:underline focus-visible:underline"
+    >
+      {story.title}
+      <span className="sr-only"> (opens in a new tab)</span>
+    </a>
+  </h2>
+  {story.standfirst && (
+    <p className="mt-4 max-w-[56ch] text-[1rem] leading-relaxed text-[color:var(--bc-silver)] [text-wrap:pretty] lg:text-[1.08rem]">{story.standfirst}</p>
+  )}
+  <div className="mt-6 flex flex-wrap items-center gap-3">
+    <a
+      href={story.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[color:var(--bc-white)] px-5 text-[0.9rem] font-semibold text-[color:var(--bc-night)] transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-0.5 hover:bg-white motion-reduce:transform-none"
+    >
+      Read at {story.source} <span aria-hidden>↗</span>
+      <span className="sr-only"> (opens in a new tab)</span>
+    </a>
+    <Link
+      href="/latest"
+      className="inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-[0.9rem] font-medium text-[color:var(--bc-white)] ring-1 ring-white/30 transition-[transform,background-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-white/[0.04] hover:ring-white/60 motion-reduce:transform-none"
+    >
+      All F1 news <span aria-hidden>→</span>
+    </Link>
+  </div>
+    </>
+  );
+
   const bar = (i: number) => (
     <span className="relative block h-[3px] w-full overflow-hidden rounded-full bg-white/20 transition-colors group-hover/bar:bg-white/35">
       {i < index && <span className="absolute inset-0 bg-white/70" />}
@@ -139,7 +183,13 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
             <span>Latest Formula 1 news</span>
           </h1>
 
-          <div aria-live={running ? 'off' : 'polite'} aria-atomic="true">
+          <div className="grid">
+            {slides.map((story, i) => (
+              <div key={`hold-${i}`} aria-hidden inert className="invisible pointer-events-none mt-4 [grid-area:1/1]">
+                {storyBody(story)}
+              </div>
+            ))}
+          <div aria-live={running ? 'off' : 'polite'} aria-atomic="true" className="[grid-area:1/1]">
             <AnimatePresence initial={false} mode="wait">
               <m.article
                 key={index}
@@ -152,44 +202,10 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
                 transition={{ duration: reducedMotion ? 0 : 0.45, ease: EASE }}
                 className="group/story mt-4"
               >
-                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.86rem] text-[color:var(--bc-silver)]">
-                  <span className="font-semibold text-[color:var(--bc-white)]">{slide.source}</span>
-                  <span aria-hidden className="text-[color:var(--bc-titanium)]">·</span>
-                  <RelativeTime ms={slide.publishedMs} />
-                </p>
-                <h2 className="mt-3 text-[clamp(1.6rem,1.05rem+2.3vw,3.25rem)] font-semibold leading-[1.1] text-[color:var(--bc-white)] [text-wrap:balance]">
-                  <a
-                    href={slide.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="decoration-[color:var(--bc-red)] decoration-2 underline-offset-[0.16em] hover:underline focus-visible:underline"
-                  >
-                    {slide.title}
-                    <span className="sr-only"> (opens in a new tab)</span>
-                  </a>
-                </h2>
-                {slide.standfirst && (
-                  <p className="mt-4 max-w-[56ch] text-[1rem] leading-relaxed text-[color:var(--bc-silver)] [text-wrap:pretty] lg:text-[1.08rem]">{slide.standfirst}</p>
-                )}
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <a
-                    href={slide.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[color:var(--bc-white)] px-5 text-[0.9rem] font-semibold text-[color:var(--bc-night)] transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-y-0.5 hover:bg-white motion-reduce:transform-none"
-                  >
-                    Read at {slide.source} <span aria-hidden>↗</span>
-                    <span className="sr-only"> (opens in a new tab)</span>
-                  </a>
-                  <Link
-                    href="/latest"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-[0.9rem] font-medium text-[color:var(--bc-white)] ring-1 ring-white/30 transition-[transform,background-color,box-shadow] duration-300 hover:-translate-y-0.5 hover:bg-white/[0.04] hover:ring-white/60 motion-reduce:transform-none"
-                  >
-                    All F1 news <span aria-hidden>→</span>
-                  </Link>
-                </div>
+                {storyBody(slide)}
               </m.article>
             </AnimatePresence>
+          </div>
           </div>
         </div>
 
