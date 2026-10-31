@@ -9,14 +9,14 @@ const expectedVercel = new Map([['jolpica-nightly','0 3 * * *'],['youtube-sync',
 // news, video and season jobs retry a provider outage in-run (scripts/invoke-cron.mjs, up to 8 minutes), hence
 // their 10-minute (season: 15) timeouts (cron resilience, 2026-10-31).
 const expectedGithub = [
-  ['rss-sync',{file:'refresh-news.yml',schedules:['2,32 * * * *'],timeout:10}],
-  ['weather-sync',{file:'refresh-weather.yml',schedules:['17 * * * *'],timeout:10}],
+  ['rss-sync',{file:'refresh-news.yml',schedules:['2 */6 * * *'],timeout:10}],
+  ['weather-sync',{file:'refresh-weather.yml',schedules:['17 */6 * * *'],timeout:10}],
   ['jolpica-nightly',{file:'refresh-season.yml',schedules:['35 3-5 * * *'],timeout:15}],
-  ['weekend-watch',{file:'refresh-weekend.yml',schedules:['4-54/10 * * * 5,6,0','4-54/10 0-6 * * 1'],timeout:10}],
-  ['youtube-sync',{file:'refresh-videos.yml',schedules:['41 */2 * * *'],timeout:10}],
+  ['weekend-watch',{file:'refresh-weekend.yml',schedules:['4 * * * 5,6,0','4 0-6 * * 1'],timeout:10}],
+  ['youtube-sync',{file:'refresh-videos.yml',schedules:['41 */12 * * *'],timeout:10}],
 ];
 // Reviewed full workflow bytes: extra schedules, steps or permissions require review.
-const workflowHashes=new Map([['refresh-news.yml','6a934444a2da6da3ee117c9eb99e88774b1eee36a5fec7035cbce314ce5002b9'],['refresh-weather.yml','843f1c96af2f0b4b9fc748de8ab9647dc4a1d1a47f4ae14c2f6867d90a0f3cda'],['refresh-season.yml','a61e6d85d5e37628c78c827a82ba3e753e3a0e09bdd530edb08e24ef50f7744a'],['refresh-weekend.yml','c35824921866cd633ee7e537c465b6d649357774455976bab61a912dcaf0c307'],['refresh-videos.yml','c4acd495aa6040960a1ccf5393c03a34fa8877ed86045e5a97441f2def1967c9']]);
+const workflowHashes=new Map([['refresh-news.yml','923a0176d46e32a25888e07facec1b9eed4a94b0035dfde6e1456312f5fc8707'],['refresh-weather.yml','142b5ba164702ed91eb7325b34e8694ac999dc066a0edee3441669e6ecc29603'],['refresh-season.yml','a61e6d85d5e37628c78c827a82ba3e753e3a0e09bdd530edb08e24ef50f7744a'],['refresh-weekend.yml','bf19c0b21f650de53e877addf219afc47b5a10a81d20bd9d4ee1eb1297f6d1be'],['refresh-videos.yml','ab4caf73505d8b4f84cb9dbf5fe8ffadadffac175f420defcebf21e4292c7539']]);
 export async function inspectSchedulers(root) {
   const issues=[];
   const vercel=JSON.parse(await readFile(path.join(root,'apps/web/vercel.json'),'utf8'));
