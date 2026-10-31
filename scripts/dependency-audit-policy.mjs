@@ -17,7 +17,9 @@ export function evaluateDependencyAudits(full,production,{now,patchVerified,regr
     const expected=Object.fromEntries(buckets.map(key=>[key,0]));
     for(const advisory of Object.values(report.advisories)){
       if(!record(advisory)||!buckets.includes(advisory.severity))return false;
-      expected[advisory.severity]++;
+      // The registry counts one per vulnerable installed version (finding), not one per advisory.
+      const findings=Array.isArray(advisory.findings)&&advisory.findings.length>0?advisory.findings.length:1;
+      expected[advisory.severity]+=findings;
     }
     return buckets.every(key=>counts[key]===expected[key]);
   };

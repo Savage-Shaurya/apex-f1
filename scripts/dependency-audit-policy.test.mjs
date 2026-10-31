@@ -102,3 +102,17 @@ test('command deadlines stop the owned process tree rather than leaving a runnin
     assert.equal(alive,false,'Owned timed-out process remains running: '+pid);
   }
 });
+
+// 2026-10-31: GHSA-g3hv-75wg-m249 (minimatch) hit two installed versions, so npm counted moderate:2 for one
+// advisory and the gate failed with a misleading "counts inconsistent" instead of naming the package.
+test('registry counts are per finding, so a multi-version advisory is named, not reported as an inconsistent response',()=>{
+  const full={advisories:{m:{module_name:'minimatch',url:'https://github.com/advisories/GHSA-g3hv-75wg-m249',severity:'moderate',
+    findings:[{version:'3.1.5',paths:['apps__web>eslint>minimatch']},{version:'10.2.6',paths:['apps__web>x>minimatch']}]}},
+    metadata:{vulnerabilities:{info:0,low:0,moderate:2,high:0,critical:0}}};
+  const verdict=evaluateDependencyAudits(full,empty(),evidence);
+  assert.equal(verdict.ready,false);
+  assert.deepEqual(verdict.rejected,['Unmitigated dependency advisory: minimatch.']);
+  // A total that matches neither advisories nor findings is still an inconsistent registry response.
+  full.metadata.vulnerabilities.moderate=3;
+  assert.deepEqual(evaluateDependencyAudits(full,empty(),evidence).rejected,['Registry advisory counts were incomplete or inconsistent.']);
+});

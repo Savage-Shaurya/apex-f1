@@ -38,7 +38,8 @@
       "esbuild@<0.25.0": ">=0.25.0",
       "source-map-js": "1.2.2",
       "postcss-selector-parser@6.0.10": "7.1.6",
-      "zod@<4.6.6": "^4.6.6"
+      "zod@<4.6.6": "^4.6.6",
+      "minimatch@<11.0.1": "^11.0.3"
     },
     "patchedDependencies": {
       "braces@3.0.3": "patches/braces@3.0.3.patch"
