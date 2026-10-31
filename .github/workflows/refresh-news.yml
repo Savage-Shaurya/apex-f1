@@ -14,7 +14,7 @@ name: Refresh news cache
 
 on:
   schedule:
-    - cron: "2,32 * * * *" # every 30 minutes, to save private-repo Actions minutes
+    - cron: "2 */6 * * *" # every 6 hours (pages also refresh on visits; owner, 2026-11-01)
   workflow_dispatch: {} # manual "Run workflow" button
 
 concurrency:
