@@ -38,9 +38,20 @@ function counting(reply: (input: unknown, init?: RequestInit) => Promise<Respons
   const impl = (async (input: unknown, init?: RequestInit) => { calls.n += 1; return reply(input, init); }) as typeof fetch;
   return { impl, calls };
 }
-const send = (fetcher: typeof fetch, timeoutMs = 50) => fetcher('https://fixture-db.upstash.io', {
-  method: 'POST', headers: { authorization: 'Bearer secret-token-value' }, body: JSON.stringify(['GET', 'apex:k']), signal: AbortSignal.timeout(timeoutMs),
-});
+// A ref'd timer, not AbortSignal.timeout(): Node 22 does not keep the event loop alive for the
+// latter, so a pending "timeout" fixture ended the file early in CI (cancelledByParent).
+const deadline = (timeoutMs: number) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('timed out', 'TimeoutError')), timeoutMs);
+  controller.signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+  return { signal: controller.signal, done: () => clearTimeout(timer) };
+};
+const send = (fetcher: typeof fetch, timeoutMs = 50) => {
+  const { signal, done } = deadline(timeoutMs);
+  return fetcher('https://fixture-db.upstash.io', {
+    method: 'POST', headers: { authorization: 'Bearer secret-token-value' }, body: JSON.stringify(['GET', 'apex:k']), signal,
+  }).finally(done);
+};
 
 test('the exact Upstash quota reply is redis-quota: breaker opens at once for 15 min, one warning, no secrets, no further network calls', async () => {
   const { impl, calls } = counting(REDIS_FAILURES.quota);

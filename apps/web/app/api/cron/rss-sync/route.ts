@@ -7,12 +7,14 @@
  * Schedule is managed by the repository deployment workflow.
  * Auth: Bearer CRON_SECRET only.
  * This job reports source counts and cache refreshes; it does not persist articles.
- * Some sources failing is a degraded success (200, degraded:true). Every source
+ * A source failing is listed in sourceHealth; the run is degraded only when coverage is
+ * lost (lib/news-coverage.ts: under half the sources answered). Every source
  * failing only because it is unavailable answers the provider-unavailable
  * contract (503, lib/cron-outcome.ts); any other total failure stays HTTP 500.
  */
 
 import { NextResponse } from "next/server";
+import { newsCoverageDegraded } from "@/lib/news-coverage";
 import {
   getF1NewsFeed,
   RSS_NEWS_CACHE_TAG,
@@ -99,7 +101,7 @@ async function synchronize(req: Request, job: JobContext) {
   });
   const responseReport = {
     ...report,
-    degraded: sourceHealth.some((source) => !source.ok),
+    degraded: newsCoverageDegraded(sourceHealth),
   };
   logReport(responseReport);
   return NextResponse.json(responseReport, { status: error ? 500 : 200 });
