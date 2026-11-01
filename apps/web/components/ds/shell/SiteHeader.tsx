@@ -14,6 +14,7 @@ import { Wordmark } from './Wordmark';
 import { activeSection, isSearchShortcut, navSections, overlayAfterRoute, type NavSeasons, type NavSection } from './nav-config';
 import { SiteMenu, type MenuLead, type MenuNextRace } from './SiteMenu';
 import { SiteSearch } from './SiteSearch';
+import { syncNavOffset } from './nav-offset';
 
 export type { MenuLead, MenuNextRace };
 
@@ -132,7 +133,7 @@ function NextRaceChip({ race }: { race: MenuNextRace }) {
  * state, the page's one action and Give back's owner-requested accent.
  * A thin red progress line on its lower edge fills as you read. Hides on
  * scroll down and returns on scroll up or focus; sets
- * html[data-shell-version="2"] and data-nav-hidden for sticky sub-bars.
+ * html[data-shell-version="2"] and, on pages with sticky sub-bars, data-nav-hidden (nav-offset.ts).
  */
 export function SiteHeader({ facts, position = 'fixed' }: { /** The shell's reads; a promise streams them in without holding back the bar. */ facts: HeaderFacts | Promise<HeaderFacts>; /** `static` renders in flow with no global side effects (design preview). */ position?: 'fixed' | 'static' }) {
   const isFixed = position === 'fixed';
@@ -170,7 +171,7 @@ export function SiteHeader({ facts, position = 'fixed' }: { /** The shell's read
       if (next !== f.hidden) {
         f.hidden = next;
         setHidden(next);
-        document.documentElement.dataset.navHidden = next ? 'true' : 'false';
+        syncNavOffset(document, next);
       }
     };
     const onScroll = () => { if (!frame) frame = requestAnimationFrame(measure); };
@@ -178,6 +179,21 @@ export function SiteHeader({ facts, position = 'fixed' }: { /** The shell's read
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => { cancelAnimationFrame(frame); window.removeEventListener('scroll', onScroll); };
   }, [isFixed]);
+
+  // A route change shows the header again and writes that state for the new page (review 2026-11-01):
+  // the flag is otherwise written only when the header hides or shows, so arriving on a page with
+  // sticky sub-bars (e.g. /contact) while it was hidden left them one header-height low. Showing it
+  // also matches the default when the new page's bars stream in later (no flag = shown).
+  useEffect(() => {
+    if (!isFixed) return;
+    const f = flags.current;
+    f.lastY = window.scrollY;
+    if (f.hidden) {
+      f.hidden = false;
+      setHidden(false);
+    }
+    syncNavOffset(document, false);
+  }, [pathname, isFixed]);
 
   useEffect(() => {
     if (!isFixed) return;
@@ -195,7 +211,7 @@ export function SiteHeader({ facts, position = 'fixed' }: { /** The shell's read
   const reveal = () => {
     flags.current.hidden = false;
     setHidden(false);
-    document.documentElement.dataset.navHidden = 'false';
+    syncNavOffset(document, false);
   };
 
   return (

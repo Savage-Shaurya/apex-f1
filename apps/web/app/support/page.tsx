@@ -87,7 +87,8 @@ function OutLink({ href, className, rel, children }: { href: string; className: 
 /**
  * Give back. The owner's own page and words: the one ask Apex will ever make
  * is a kindness to an animal. Carbon & Light: night, carbon and one warm
- * light rising from below. No photographs; type and light carry it.
+ * light rising from below (rays on every screen: WebGL where it runs, the
+ * same fan in CSS on phones). No photographs; type and light carry it.
  */
 export default function SupportPage() {
   return (
@@ -96,7 +97,7 @@ export default function SupportPage() {
       <section aria-labelledby="give-title" className="relative isolate overflow-hidden">
         <KindLight className="pointer-events-none absolute inset-0 -z-10 [&>div]:absolute [&>div]:inset-0" />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-40 bg-gradient-to-b from-[color:var(--bc-night)] to-transparent" />
-        <div className="ds-container pb-40 pt-14 text-center sm:pb-48 sm:pt-20 lg:pb-56 lg:pt-24">
+        <div className="ds-container pb-24 pt-12 text-center sm:pb-48 sm:pt-20 lg:pb-56 lg:pt-24">
           <p className="bc-label bc-in-up text-[color:var(--bc-silver)]" style={delay(0)}>Give back</p>
           <h1 id="give-title" className="mt-7 text-balance text-white">
             <span className="bc-mask bcp-fit" style={fitDisplay('Every life deserves', { max: 7 })}>

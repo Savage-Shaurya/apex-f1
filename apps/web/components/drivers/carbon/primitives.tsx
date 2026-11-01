@@ -1,10 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { cn } from '@apex/ui';
+import { LitFrame } from './LitFrame';
 import '@/components/brand-c/brand-c.css';
 import './drivers.css';
 import { ScrollMotion } from '@/components/brand-c/ScrollMotion';
 import { Portrait, type PortraitFraming } from '@/components/ds/Portrait';
-import { cloudinaryAspect, f1FramedCutout, isPhotograph } from '@/lib/f1-media-urls';
+import { isPhotograph } from '@/lib/f1-media-urls';
 import { normalizeHex } from '@/components/ds/color';
 import { fitSize } from '../fit';
 
@@ -106,12 +107,9 @@ export function LitPortrait({
 }) {
   const frameRatio = ratio ?? (framing === 'head' ? '1 / 1' : framing === 'full' ? '5 / 8' : '4 / 5');
   const cutout = Boolean(src) && !isPhotograph(src);
-  const aspect = cloudinaryAspect(frameRatio);
-  const maskSrc = src && cutout ? (framing !== 'full' && aspect ? f1FramedCutout(src, aspect, 640) : src) : null;
   const team = normalizeHex(teamColor) ?? '#9b9ea7';
-  const vars = { '--team': team, '--src': maskSrc ? `url("${maskSrc}")` : 'none' } as CSSProperties;
   return (
-    <div className={cn('dr-lit relative', className)} style={{ ...vars, ...style }}>
+    <LitFrame masked={cutout} team={team} frameRatio={frameRatio} full={framing === 'full'} className={className} style={style}>
       <Portrait
         src={src}
         fallbackSrc={fallbackSrc}
@@ -129,16 +127,7 @@ export function LitPortrait({
         emptyLabel={emptyLabel}
         inset={framing === 'full' ? '4% 4% 0' : undefined}
       />
-      {maskSrc && (
-        <div aria-hidden className="dr-light" style={{ aspectRatio: frameRatio, bottom: 'auto', ...(framing === 'full' ? { padding: '4% 4% 0' } : null) }}>
-          <div className="relative h-full w-full">
-            <div className="bc-lit bc-lit--key" />
-            <div className="bc-lit bc-lit--top" />
-            <div className="bc-lit bc-lit--rim" />
-          </div>
-        </div>
-      )}
-    </div>
+    </LitFrame>
   );
 }
 

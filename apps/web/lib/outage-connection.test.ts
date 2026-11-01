@@ -29,13 +29,21 @@ test('F-03: a provider outage while `next build` prerenders keeps the route ISR 
   }
 });
 
-test('F-03: a runtime ISR regeneration still serves its honest state without a dynamic bailout', async () => {
+test('F-03 + DRV-2/RES-3/TEAMS-10: a runtime ISR render that met an outage is cached for one minute, never the full window', async () => {
   const phase = process.env.NEXT_PHASE;
   delete process.env.NEXT_PHASE;
   try {
     const store = prerenderStore(300);
+    // No dynamic bailout (connection() would throw DYNAMIC_SERVER_USAGE in an ISR render)...
     await workUnitAsyncStorage.run(store as never, () => outageConnection());
-    assert.equal(store.revalidate, 300);
+    // ...but before this fix the degraded render ("Career data unavailable", no chart) was kept for 300 s.
+    assert.equal(store.revalidate, 60, 'a degraded ISR copy heals within a minute');
+    const day = prerenderStore(86_400);
+    await workUnitAsyncStorage.run(day as never, () => outageConnection());
+    assert.equal(day.revalidate, 60);
+    const shorter = prerenderStore(30);
+    await workUnitAsyncStorage.run(shorter as never, () => outageConnection());
+    assert.equal(shorter.revalidate, 30, 'never lengthens an already shorter window');
   } finally {
     if (phase !== undefined) process.env.NEXT_PHASE = phase;
   }

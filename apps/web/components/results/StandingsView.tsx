@@ -15,10 +15,11 @@ import { getSeasonContext } from '@/lib/season';
 import { requestNow } from '@/components/schedule/data';
 import { CONSTRUCTORS_FROM, loadSeasonSummary } from './data';
 import { LeaderCard } from './LeaderCard';
+import { pastLeaderPhoto } from './leader-photo';
 import { fmtPoints, tableNote, titleMaths, type TitleMaths } from './sheet';
 import { StandingsBoard, type BoardRow } from './StandingsBoard';
 import { providerOutage } from '@/lib/provider-outage';
-import { outageDuringBuild } from '@/lib/outage-connection';
+import { outageConnection, outageDuringBuild } from '@/lib/outage-connection';
 import { constructorTableNote } from '@/lib/provider-notes';
 
 const d = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties;
@@ -146,8 +147,12 @@ export async function StandingsView({ kind, season, newestSeason }: { kind: 'dri
     loadSeasonSummary(season, kind, rows.map((r) => ({ id: r.id, points: r.points })), tableRound),
     isLive ? getCalendar() : Promise.resolve(null),
   ]);
+  // Part of the season summary is missing after a retry: serve this render for one minute only (RES-3).
+  if (summary.degraded) await outageConnection();
   const leader = rows[0]!;
   const second = rows[1];
+  // RES-6: a past champion's card shows their real (credited) Commons photo instead of a flat plate.
+  const pastPhoto = !isLive && decided ? await pastLeaderPhoto(kind, read.data.standings[0], leader) : null;
   const ownCalendar = calendar && calendar.season === season && calendar.races.length ? calendar : null;
   const totalRounds = ownCalendar ? ownCalendar.races.length : null;
   // Rounds the table actually contains. When the running totals reproduce the official table, the
@@ -190,7 +195,8 @@ export async function StandingsView({ kind, season, newestSeason }: { kind: 'dri
     { k: decided ? 'Champion' : 'Leader', v: fmtPoints(leader.points), note: <>points · {leader.last}</> },
     ...(second ? [{ k: decided ? 'Margin' : 'Gap to P2', v: fmtPoints(leader.points - second.points), note: <>points to {second.last}</> }] : []),
     { k: 'Rounds', v: <>{countedRound ?? '–'}{totalRounds ? <span className="text-[color:var(--bc-titanium)]"> / {totalRounds}</span> : null}</>, note: totalRounds ? 'counted' : decided ? 'in the season' : 'counted' },
-    ...(summary.winners != null ? [{ k: 'Winners', v: String(summary.winners), note: kind === 'drivers' ? 'different race winners' : 'winning constructors' }] : []),
+    // Always present, so a missing read never leaves a hole in the strip; the dash says it is unknown, not zero.
+    { k: 'Winners', v: summary.winners != null ? String(summary.winners) : '–', note: summary.winners != null ? (kind === 'drivers' ? 'different race winners' : 'winning constructors') : 'race results unavailable right now' },
     ...(maths && !maths.clinched && maths.roundsLeft > 0 ? [{ k: 'Still to win', v: fmtPoints(maths.pointsLeft), note: <>points{nextRace ? <> · next: {decodeEntities(nextRace.name).replace(/ Grand Prix$/, '')}</> : null}</> }] : []),
   ];
 
@@ -206,7 +212,7 @@ export async function StandingsView({ kind, season, newestSeason }: { kind: 'dri
         allYears={allYears}
         colour={leader.colour}
         label={<>{champLabel}<Sep />{decided ? 'Final standings' : countedRound != null ? <>After round {countedRound}{totalRounds ? ` of ${totalRounds}` : ''}</> : 'Latest standings'}</>}
-        aside={<LeaderCard row={leader} kind={kind} decided={decided} season={season} portrait={isLive && kind === 'drivers'} />}
+        aside={<LeaderCard row={leader} kind={kind} decided={decided} season={season} portrait={isLive && kind === 'drivers'} photo={pastPhoto} />}
       >
         {story && <p className="bc-in-up mt-6 max-w-[54ch] text-[1.05rem] leading-relaxed text-[color:var(--bc-silver)] md:text-[1.12rem]" style={d(240)}>{story}</p>}
         {notes.length > 0 && <p className="mt-3 max-w-[64ch] text-[0.88rem] leading-relaxed text-[color:var(--bc-titanium)]">{notes.join(' ')}</p>}

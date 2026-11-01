@@ -20,9 +20,9 @@ import { CircuitSvg } from '@/components/circuit/CircuitSvg';
 import { PickBoard } from '@/components/predict/PickBoard';
 import type { PickDriver } from '@/components/predict/DriverSheet';
 import { PREDICT_QUESTIONS, PREDICT_MAX, scorePicks } from '@/lib/predict';
-import { getCalendar, getGrid } from '@/lib/grid';
+import { getCalendar, getDriverStandings, getGrid } from '@/lib/grid';
 import { getActiveSeason } from '@/lib/season';
-import { loadSheet } from '@/components/live/sheet';
+import { settleWithin } from '@/lib/settle-within';
 import { withSocial } from '@/lib/page-metadata';
 
 export const revalidate = 600;
@@ -35,20 +35,33 @@ export const metadata: Metadata = withSocial({
 
 const UTC_LONG = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
 
-export default async function PredictPage() {
-  let races: ReturnType<typeof mapRace>[] = [];
-  let entries: ReturnType<typeof mapDriver>[] = [];
-  let dataUnavailable = false;
+/** Photos and colours on the pick board: worth at most this long of the first paint (VI-02). */
+const GRID_BUDGET_MS = 2_500;
+
+async function readEntries() {
   try {
     const [schedule, list] = await Promise.all([
       jolpica.getSchedule('current', { revalidate: 3600, strict: true }),
       jolpica.getDrivers('current', { revalidate: 1800, strict: true }),
     ]);
-    races = schedule.map(mapRace);
-    entries = list.map(mapDriver);
-  } catch { dataUnavailable = true; }
-  // Request time from the per-request calendar read (shared with the shell; no extra provider call).
-  const { now } = await getCalendar();
+    return { races: schedule.map(mapRace), entries: list.map(mapDriver), dataUnavailable: false };
+  } catch {
+    return { races: [] as ReturnType<typeof mapRace>[], entries: [] as ReturnType<typeof mapDriver>[], dataUnavailable: true };
+  }
+}
+
+export default async function PredictPage() {
+  // Every independent read starts at once (audit 2026-11-01 VI-02: they ran one after another, then
+  // waited on two sequential 8 s OpenF1 reads for team names). Team names come from the Jolpica
+  // standings via getGrid; the grid's photos are enrichment with a short budget, never a blocker.
+  const [{ races, entries, dataUnavailable }, { now }, grid, standings] = await Promise.all([
+    readEntries(),
+    getCalendar(),
+    settleWithin(getGrid(), GRID_BUDGET_MS, [] as Awaited<ReturnType<typeof getGrid>>),
+    getDriverStandings().catch(() => [] as Awaited<ReturnType<typeof getDriverStandings>>),
+  ]);
+  // Jolpica-only team names, used when the grid enrichment did not answer in its budget.
+  const standingsTeam = new Map(standings.map((s) => [s.driver.slug, s.constructorName] as const));
   const next = races.find((r) => new Date(r.raceStartIso).getTime() > now);
   const lastDone = [...races].reverse().find((r) => new Date(r.raceStartIso).getTime() < now);
   const season = next?.season ?? lastDone?.season ?? (await getActiveSeason().catch(() => null));
@@ -94,11 +107,13 @@ export default async function PredictPage() {
   // The latest race with a published result; the one just run may not have its classification yet.
   const started = races.filter((r) => new Date(r.raceStartIso).getTime() < now).reverse().slice(0, 2);
   let pending: string | null = null;
-  for (const done of started) {
-    const [rr, quali] = await Promise.all([
-      jolpica.getRaceResults(done.season, done.round, { revalidate: 3600, strict: true }),
-      jolpica.getQualifying(done.season, done.round, { revalidate: 3600, strict: true }),
-    ]).catch(() => [null, []] as const);
+  // Both candidate races are read together; the newest with a published result is used.
+  const reads = await Promise.all(started.map((done) => Promise.all([
+    jolpica.getRaceResults(done.season, done.round, { revalidate: 3600, strict: true }),
+    jolpica.getQualifying(done.season, done.round, { revalidate: 3600, strict: true }),
+  ]).catch(() => [null, []] as const)));
+  for (const [i, done] of started.entries()) {
+    const [rr, quali] = reads[i]!;
     if (!rr || rr.results.length === 0) {
       if (done === started[0]) pending = done.name;
       continue;
@@ -122,12 +137,10 @@ export default async function PredictPage() {
   }
 
   // Display enrichment only; the prediction contract carries driver ids.
-  // Team names come from the latest timed session (OpenF1), the same names the /live sheets print.
-  const [grid, sheet] = await Promise.all([getGrid().catch(() => []), loadSheet(undefined).catch(() => null)]);
-  const timedTeam = new Map(sheet?.state === 'ready' ? [...sheet.drivers.values()].map((d) => [`${d.code}|${d.number}` as string, d.team] as const) : []);
+  // Team names are the official entry's (Jolpica standings, the same names as the rest of Apex).
   const gridBySlug = new Map(grid.map((g) => [g.slug, g] as const));
   const pickers: PickDriver[] = entries
-    .filter((d) => (lineup ? lineup.has(d.slug) : grid.length ? gridBySlug.has(d.slug) : true))
+    .filter((d) => (lineup ? lineup.has(d.slug) : grid.length ? gridBySlug.has(d.slug) : standingsTeam.size ? standingsTeam.has(d.slug) : true))
     .map((d) => {
       const g = gridBySlug.get(d.slug);
       return {
@@ -135,7 +148,7 @@ export default async function PredictPage() {
         name: d.fullName,
         firstName: g?.firstName ?? d.fullName.split(' ').slice(0, -1).join(' '),
         lastName: g?.lastName ?? d.fullName.split(' ').at(-1) ?? d.fullName,
-        team: (g && timedTeam.get(`${g.code}|${g.number}`)) ?? g?.team ?? null,
+        team: g?.team ?? standingsTeam.get(d.slug) ?? null,
         color: g?.color ?? null,
         number: g?.number ?? null,
         code: g?.code ?? null,

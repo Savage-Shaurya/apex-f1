@@ -8,7 +8,9 @@ import { SmartImage } from '@/components/shell/SmartImage';
  * A YouTube poster, whole, in a 16:9 frame. YouTube posters are 16:9
  * pictures (the 4:3 sd/hq fallbacks are the same picture with black bars),
  * so `cover` never cuts the subject: it only trims the bars. SmartImage
- * walks maxres, sd, hq. If every rendition fails the frame keeps its size
+ * walks maxres, sd, hq. The card takes the smallest of YouTube's own 320/480/
+ * 640/1280 renditions that covers it (a srcset, no image-optimizer
+ * transformation; review 2026-11-01). If every rendition fails the frame keeps its size
  * and says so in words. `children` are overlays (the play mark), never text
  * on the picture itself.
  */

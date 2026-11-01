@@ -86,3 +86,32 @@ test('OpenF1 "No results found." 404 is confirmed empty data; other 404s stay fa
   assert.deepEqual(await openf1.getIntervals(11396, { strict: true, fetchImpl: empty, lastGoodStore: null }), []);
   await assert.rejects(openf1.getIntervals(11396, { strict: true, fetchImpl: async () => new Response('<html>Not Found</html>', { status: 404 }), lastGoodStore: null }), ProviderError);
 });
+
+test('SRL-3: while the lockout is remembered, a cacheable read still asks Next\'s data cache (its stored 200 is the durable last-good copy without Redis)', async () => {
+  const state = globalThis as typeof globalThis & { __apexOpenF1LockedUntil?: number };
+  const realFetch = globalThis.fetch;
+  const token = process.env.OPENF1_ACCESS_TOKEN;
+  delete process.env.OPENF1_ACCESS_TOKEN;
+  const inits: Array<RequestInit | undefined> = [];
+  // Stands in for Next's patched fetch answering from its data cache (a stale entry is served, a 401 is never stored).
+  globalThis.fetch = Object.assign(async (_input: unknown, init?: RequestInit) => { inits.push(init); return Response.json([session]); }, { __nextPatched: true }) as unknown as typeof fetch;
+  try {
+    state.__apexOpenF1LockedUntil = Date.now() + 60_000;
+    // Before: the in-process memo threw OpenF1LiveSessionLockout without calling fetch, so a good cached
+    // session list was never read and /live/* showed "could not be loaded" during every live session.
+    const seen: OpenF1Provenance[] = [];
+    const rows = await openf1.getSessionsForYear(2026, { strict: true, revalidate: 300, lastGoodStore: null, onProvenance: (p) => seen.push(p) });
+    assert.equal(rows[0]?.session_key, 11392);
+    assert.equal(seen[0]?.source, 'last-good', 'labelled as an earlier copy, so the page still says a session is running');
+    assert.equal(seen[0]?.reason, 'live-session-lockout');
+    assert.equal(inits.length, 1);
+    assert.equal(inits[0]?.cache, 'force-cache', 'a cached copy of any age is used; no doomed revalidation is started');
+    // A fresh read (revalidate 0) has no cache to ask: it is still refused without a request.
+    await assert.rejects(openf1.getSessionsForYear(2026, { strict: true, revalidate: 0, lastGoodStore: null }), OpenF1LiveSessionLockout);
+    assert.equal(inits.length, 1);
+  } finally {
+    globalThis.fetch = realFetch;
+    resetOpenF1LockoutMemo();
+    if (token !== undefined) process.env.OPENF1_ACCESS_TOKEN = token;
+  }
+});

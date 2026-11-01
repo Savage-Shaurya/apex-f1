@@ -104,7 +104,7 @@ export function WireLead({ story, headingLevel = 2 }: { story: WireStory; headin
       {story.imageUrl && (
         <div className="relative lg:col-span-8">
           <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-16 lg:-inset-x-8 bottom-1/3 -z-10 rounded-full bg-[radial-gradient(closest-side,rgb(233_240_255/0.10),transparent)]" />
-          <WireImage src={story.imageUrl} alt="" kind="wide" radius="l" priority sizes="(max-width: 1024px) 100vw, 62vw" />
+          <WireImage src={story.imageUrl} alt="" kind="wide" radius="l" priority sizes="(max-width: 1023px) 100vw, 62vw" />
         </div>
       )}
       <div className={cn('min-w-0', story.imageUrl ? 'lg:col-span-4 lg:pb-8' : 'lg:col-span-9')}>
@@ -128,7 +128,7 @@ export function WireSpread({ story, flip = false }: { story: WireStory; flip?: b
   return (
     <article className={cn(CARD, 'grid gap-5 border-b border-white/[0.08] py-9 md:gap-6 lg:col-span-2 lg:grid-cols-12 lg:items-center lg:gap-x-10')}>
       {story.imageUrl && (
-        <WireImage src={story.imageUrl} alt="" kind="wide" sizes="(max-width: 1024px) 100vw, 55vw" className={cn('lg:col-span-7', flip && 'lg:order-2')} />
+        <WireImage src={story.imageUrl} alt="" kind="wide" sizes="(max-width: 1023px) 100vw, 55vw" className={cn('lg:col-span-7', flip && 'lg:order-2')} />
       )}
       <div className={cn('min-w-0 lg:col-span-5', flip && 'lg:order-1')}>
         <StoryMeta story={story} />
@@ -161,7 +161,7 @@ export function WireRow({ story }: { story: WireStory }) {
           src={story.imageUrl}
           alt=""
           kind="photo"
-          sizes="(max-width: 640px) 112px, (max-width: 1024px) 160px, 208px"
+          sizes="(max-width: 640px) 112px, (max-width: 1023px) 160px, 208px"
           className="float-right mb-2 ml-4 w-28 sm:ml-6 sm:w-40 lg:float-none lg:m-0 lg:w-auto"
         />
       )}

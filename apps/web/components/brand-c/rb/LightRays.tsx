@@ -4,6 +4,7 @@
  * Change for Apex: frames run on GSAP's ticker (./frame) instead of a private rAF loop.
  */
 import { requestFrame, cancelFrame } from './frame';
+import { canvasPixelRatio } from './pixel-ratio';
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
@@ -88,7 +89,6 @@ interface Program {
   uniforms: Record<string, WebGLUniformLocation | null>;
 }
 
-const PIXEL_BUDGET = 0.9e6;
 // Ambient light runs at 30 fps on the shared clock.
 const FRAME_GAP = 1000 / 30 - 3;
 const MAX_PULSES = 4;
@@ -417,14 +417,9 @@ const LightRays = ({
       const rect = container.getBoundingClientRect();
       const cssWidth = Math.max(1, rect.width);
       const cssHeight = Math.max(1, rect.height);
-      const detail = s.density * (0.35 + 0.65 * s.sharpness);
-      const sampling = Math.max(clamp(0.35 + 0.3 * detail, 0.5, 2), s.noise > 0 ? 1 : 0);
-      const ratio = Math.min(
-        window.devicePixelRatio || 1,
-        s.maxRatio,
-        sampling,
-        Math.sqrt(PIXEL_BUDGET / (cssWidth * cssHeight))
-      );
+      // Sharp at the screen's density (capped by maxRatio; at least 1 css px unless the pixel budget needs less):
+      // the old density-based undersampling drew the rays at a quarter of the pixels (audit HNV-7).
+      const ratio = canvasPixelRatio({ dpr: window.devicePixelRatio || 1, maxRatio: s.maxRatio, cssWidth, cssHeight });
       const width = Math.max(1, Math.round(cssWidth * ratio));
       const height = Math.max(1, Math.round(cssHeight * ratio));
       if (canvas.width !== width || canvas.height !== height) {

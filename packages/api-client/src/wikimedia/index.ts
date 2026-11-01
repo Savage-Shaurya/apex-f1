@@ -30,7 +30,15 @@ const RASTER = /\.(?:jpe?g|png|webp|gif)$/i;
 const THUMBNAILABLE = /\.(?:jpe?g|png|webp|gif|svg)$/i;
 const COMMONS_HOSTS = new Set(['upload.wikimedia.org', 'thumb.wikimedia.org']);
 
-export type CommonsFetchOptions = ProviderRequestOptions & { revalidate?: number };
+export type CommonsFetchOptions = ProviderRequestOptions & {
+  revalidate?: number;
+  /**
+   * Rethrow a provider failure (429, timeout, network) instead of answering
+   * null, so a caller that caches the result can tell "Commons has no such
+   * image" (cacheable) from "Commons did not answer" (never cached).
+   */
+  throwOnFailure?: boolean;
+};
 
 /** Smallest served bucket that covers `width`, never above what the original can supply. */
 export function commonsBucket(width: number, originalWidth?: number | null): number {
@@ -200,7 +208,8 @@ export async function getCommonsImage(input: string, options: CommonsFetchOption
         .map((c) => (typeof c.title === 'string' ? c.title.replace(/^Category:/, '') : ''))
         .filter(Boolean),
     };
-  } catch {
+  } catch (error) {
+    if (options.throwOnFailure) throw error;
     return null;
   }
 }

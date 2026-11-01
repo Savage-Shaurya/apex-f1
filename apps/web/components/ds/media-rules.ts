@@ -54,3 +54,18 @@ export function resolveFit(rule: MediaRule, natural: { width: number; height: nu
   const difference = Math.abs(naturalRatio - frameRatio) / Math.max(naturalRatio, frameRatio);
   return difference <= FIT_TOLERANCE ? 'cover' : 'contain';
 }
+
+/**
+ * Fit and focal point for a photograph in a portrait frame: cover with faces
+ * in the upper third while the crop stays within FIT_TOLERANCE, otherwise the
+ * whole picture is matted (centred). Near-square studio portraits in tall
+ * plinths are given a square frame by their caller instead (DRV-7): a
+ * wider-than-frame photo is cropped at its sides only, so no fit can add
+ * headroom, and a matte band above a photo reads as a broken bar.
+ */
+export function photoFraming(natural: { width: number; height: number } | null, frameRatio: number, focal = '50% 22%'): { fit: 'cover' | 'contain'; focal: string } {
+  if (!natural || !natural.width || !natural.height) return { fit: 'cover', focal };
+  const a = natural.width / natural.height;
+  const within = Math.abs(a - frameRatio) / Math.max(a, frameRatio) <= FIT_TOLERANCE;
+  return within ? { fit: 'cover', focal } : { fit: 'contain', focal: '50% 50%' };
+}

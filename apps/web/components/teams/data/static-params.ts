@@ -1,5 +1,6 @@
 import { jolpica } from '@apex/api-client/jolpica';
 import { prebuildable, readConstructorIdentity, readPublicSport, retryUnavailable, SPORT_READ_OPTIONS, type RetryOptions } from '@/lib/public-sport';
+import { prebuildChampionIds } from '@/lib/championship-snapshot';
 
 type ConstructorList = Pick<typeof jolpica, 'getConstructors'>;
 
@@ -21,4 +22,21 @@ export async function currentTeamParams(provider: ConstructorList = jolpica, ret
   const params = [...new Set(read.data.map((c) => c.constructorId).filter((id) => /^[a-zA-Z0-9_-]{1,160}$/.test(id)))].map((slug) => ({ slug }));
   // A team whose record cannot be read now is left out of the prebuild, not baked as an outage (F-01).
   return prebuildable(params, probe);
+}
+
+/**
+ * Prebuilt paths for /teams/[slug] and /teams/[slug]/history: the current teams,
+ * then the most visited constructors' champions from the committed championship
+ * capture (no provider read to list them): multiple champions and this
+ * century's champions (prebuildChampionIds). A cold first visit waited 3-23 s
+ * (audit 2026-11-01 TEAMS-6), but every champion × two routes cost too many
+ * Jolpica reads per build (review 2026-11-01, finding 3); the rest render on
+ * first visit. A champion whose record does not answer at build time is left
+ * out and renders on first visit.
+ */
+export async function teamPageParams(provider: ConstructorList = jolpica, retry: RetryOptions = {}, probe: (param: { slug: string }) => Promise<boolean> = provider === jolpica ? teamRecordAnswers : async () => true): Promise<{ slug: string }[]> {
+  const current = await currentTeamParams(provider, retry, probe);
+  const have = new Set(current.map((p) => p.slug));
+  const champions = prebuildChampionIds().constructors.filter((id) => /^[a-zA-Z0-9_-]{1,160}$/.test(id) && !have.has(id)).map((slug) => ({ slug }));
+  return [...current, ...(await prebuildable(champions, probe))];
 }

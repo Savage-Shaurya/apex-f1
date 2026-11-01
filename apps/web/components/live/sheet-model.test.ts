@@ -335,3 +335,14 @@ test('a coded position ("RT" in Singapore qualifying) is accepted, never printed
   assert.equal(out[1]!.status, 'Retired');
   assert.equal(out[1]!.position, null);
 });
+
+test('SRL-3: the OpenF1 live-session refusal (OpenF1LiveSessionLockout) reads as "locked", not as a network failure', async () => {
+  const { OpenF1LiveSessionLockout } = await import('@apex/api-client/openf1');
+  const { readFailure: classify } = await import('./sheet-model');
+  // The client throws this subclass (name 'OpenF1LiveSessionLockout', status 401, no `reason`).
+  assert.equal(classify(new OpenF1LiveSessionLockout()), 'locked');
+  assert.equal(classify(new OpenF1LiveSessionLockout(), true), 'locked', 'the refusal text is proof of the lockout even with a token set');
+  // A plain 401 with a token configured is still an auth problem, not the lockout.
+  const { ProviderError } = await import('../../../../packages/api-client/src/transport');
+  assert.equal(classify(new ProviderError('openf1', 'http', 401), true), 'network');
+});

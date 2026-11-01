@@ -40,10 +40,15 @@ const nextConfig: NextConfig = {
   // so pixels are never proxied twice. These patterns cover any next/image
   // use and list every image host the product loads; stock hosts are gone.
   images: {
-    formats: ['image/avif', 'image/webp'],
-    deviceSizes: [390, 640, 828, 1080, 1280, 1440, 1920, 2560],
-    imageSizes: [64, 96, 128, 256, 384],
-    minimumCacheTTL: 86_400,
+    // Transformation budget (review 2026-11-01, finding 4; Vercel Hobby ~5K/month): only publisher
+    // news photos go through the optimizer (lib/image-renditions OPTIMIZER_HOST); Commons, YouTube
+    // and F1 media use their own renditions. One format (WebP: every supported browser, and a much
+    // cheaper encode than AVIF), the five widths optimizedRendition asks for, and a 30-day cache:
+    // a publisher's photo URL never changes its pixels.
+    formats: ['image/webp'],
+    deviceSizes: [640, 1080, 1440, 1920],
+    imageSizes: [384],
+    minimumCacheTTL: 2_592_000,
     remotePatterns: [
       { protocol: 'https', hostname: 'i.ytimg.com' },
       { protocol: 'https', hostname: 'media.formula1.com' },
@@ -74,6 +79,13 @@ const nextConfig: NextConfig = {
       {
         source: '/fonts/:file*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      // /search is a static page that reads ?q= on the client (audit 2026-11-01 VI-01); a typed
+      // query's URL is still kept out of search engines (audit SEO-4) and canonicalises to /search.
+      {
+        source: '/search',
+        has: [{ type: 'query', key: 'q' }],
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }],
       },
       {
         source: '/(.*)',

@@ -51,13 +51,18 @@ export function CarStage({
 }) {
   const img = useRef<HTMLImageElement>(null);
   const [failed, setFailed] = useState(false);
+  // The light mask and the floor reflection reuse the car's own loaded file (currentSrc), set only
+  // once it has loaded. A CSS mask ignores loading="lazy": with the URL set at render, /teams
+  // downloaded every car (13-14 w_960 copies) at page open, competing with the hero (audit TEAMS-5).
+  const [mask, setMask] = useState<string | null>(null);
   const rendition = useMemo(() => (src ? bestRendition(src) : null), [src]);
-  const mask = src ? carAt(src, 960) : null;
 
-  // An image that failed before hydration never fires onError in React: check it once.
+  // An image that settled before hydration never fires onLoad/onError in React: check it once.
   useEffect(() => {
     const el = img.current;
-    if (el && el.complete && el.naturalWidth === 0 && el.getAttribute('src')) setFailed(true);
+    if (!el || !el.complete || !el.getAttribute('src')) return;
+    if (el.naturalWidth === 0) setFailed(true);
+    else if (el.currentSrc) setMask(el.currentSrc);
   }, [src]);
 
   const team = color ?? '#6b6e76';
@@ -85,13 +90,14 @@ export function CarStage({
                 loading={priority ? 'eager' : 'lazy'}
                 fetchPriority={priority ? 'high' : 'auto'}
                 onError={() => setFailed(true)}
+                onLoad={(e) => setMask(e.currentTarget.currentSrc || null)}
                 className="tc-car absolute inset-0 h-full w-full object-contain"
               />
-              <div aria-hidden className="tc-lit tc-lit--key" />
-              <div aria-hidden className="tc-lit tc-lit--rim" />
-              {reflection && (
-                // eslint-disable-next-line @next/next/no-img-element -- decorative mirror of the same rendition
-                <img src={mask!} alt="" aria-hidden decoding="async" loading="lazy" className="tc-reflect pointer-events-none absolute left-0 top-[97%] h-full w-full object-contain" />
+              {mask && <div aria-hidden className="tc-lit tc-lit--key" />}
+              {mask && <div aria-hidden className="tc-lit tc-lit--rim" />}
+              {reflection && mask && (
+                // eslint-disable-next-line @next/next/no-img-element -- decorative mirror of the same (already loaded) file
+                <img src={mask} alt="" aria-hidden decoding="async" className="tc-reflect pointer-events-none absolute left-0 top-[97%] h-full w-full object-contain" />
               )}
               {glare && <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden"><div className="bc-glare" /></div>}
             </>

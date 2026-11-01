@@ -35,7 +35,15 @@ export interface Rendition {
   fallbacks?: string[];
 }
 
-const F1_MEDIA_WIDTHS = [320, 480, 640, 960, 1280, 1600, 1920];
+/**
+ * Cloudinary serves any width. Small widths (80-240) right-size table
+ * headshots (a 40 px slot at dpr 3 needs 120 px; audit 2026-11-01 RES-low); 720
+ * fits a ~230 px phone portrait at dpr 3 (DRV-3, which otherwise took 960);
+ * 2400-3840 keep full-width car heroes sharp on 2x screens (the car masters
+ * are 3840 px; TEAMS-4).
+ */
+const F1_MEDIA_WIDTHS = [80, 120, 160, 240, 320, 480, 640, 720, 960, 1280, 1600, 1920, 2400, 2880, 3840];
+const F1_MEDIA_MAX = F1_MEDIA_WIDTHS.at(-1)!;
 const F1_LEGACY_WIDTHS = [320, 480, 640, 960, 1536, 1920];
 /** Wikimedia's served thumbnail buckets (see the header). */
 const COMMONS_BUCKETS = [330, 500, 960, 1280, 1920];
@@ -106,6 +114,16 @@ function hostRendition(src: string, options: RenditionOptions): Rendition {
     };
   }
 
+  // ESPN combiner resizes by `w=` itself (probed 2026-11-01: w=480 33 KB vs 154 KB at 1296), so a
+  // card takes a right-sized file without an optimizer pass. The real width is in the file name.
+  if (/(^|\.)espncdn\.com$/.test(host) && url.pathname === '/combiner/i' && url.searchParams.get('img')) {
+    const base = src.replace(/&w=\d+/, '');
+    const real = Number(url.searchParams.get('img')!.match(/_(\d{3,4})x\d{3,4}/)?.[1]) || intrinsic || 1296;
+    const widths = [480, 640, 960].filter((w) => w < real).concat(real);
+    const at = (w: number) => `${base}&w=${w}`;
+    return { src: at(real), srcSet: widths.map((w) => `${at(w)} ${w}w`).join(', '), maxWidth: real, fallbacks: [base] };
+  }
+
   // YouTube thumbnails: maxres (16:9, no letterbox bars) first.
   if (/(^|\.)ytimg\.com$/.test(host)) {
     const id = youtubeId(src);
@@ -113,8 +131,10 @@ function hostRendition(src: string, options: RenditionOptions): Rendition {
       const base = `https://i.ytimg.com/vi/${id}`;
       return {
         src: `${base}/maxresdefault.jpg`,
-        // mqdefault is the small 16:9 frame (320x180, ~18 KB): small cards on phones need nothing more.
-        srcSet: `${base}/mqdefault.jpg 320w, ${base}/maxresdefault.jpg 1280w`,
+        // Every real rendition, so a card takes the smallest one that covers it (audit 2026-11-01 HNV-4):
+        // mqdefault 320x180 (16:9), hqdefault 480x360 and sddefault 640x480 (the same 16:9 frame with
+        // 4:3 bars, which `cover` in a 16:9 frame trims exactly), maxresdefault 1280x720.
+        srcSet: `${base}/mqdefault.jpg 320w, ${base}/hqdefault.jpg 480w, ${base}/sddefault.jpg 640w, ${base}/maxresdefault.jpg 1280w`,
         maxWidth: 1280,
         fallbacks: [`${base}/sddefault.jpg`, `${base}/hqdefault.jpg`],
       };
@@ -128,7 +148,7 @@ function hostRendition(src: string, options: RenditionOptions): Rendition {
     if (m) {
       const [, transform, rest] = m;
       const variant = (w: number) => `https://media.formula1.com/image/upload/${transform!.replace(/\bw_\d+/, `w_${w}`)}/${rest}`;
-      return { src, srcSet: F1_MEDIA_WIDTHS.map((w) => `${variant(w)} ${w}w`).join(', '), maxWidth: 1920 };
+      return { src, srcSet: F1_MEDIA_WIDTHS.map((w) => `${variant(w)} ${w}w`).join(', '), maxWidth: F1_MEDIA_MAX };
     }
   }
 
@@ -174,12 +194,16 @@ function hostRendition(src: string, options: RenditionOptions): Rendition {
       const variant = (w: number) => `https://upload.wikimedia.org/wikipedia/commons/thumb/${a}/${ab}/${file}/${w}px-${file}${suffix}`;
       const current = thumb ? Number(parts[7]?.match(/^(\d+)px-/)?.[1]) : NaN;
       if (intrinsic !== null && !suffix) {
-        // Only buckets narrower than the original exist; the original itself is the largest candidate.
+        // Only buckets narrower than the original exist. The original is a candidate only when it is
+        // narrower than the top bucket (then it is the largest picture there is); a 5184 px, 7 MB
+        // original is never offered (audit 2026-11-01 SRL-1: it was labelled "1920w").
         const original = `https://upload.wikimedia.org/wikipedia/commons/${a}/${ab}/${file}`;
+        const top = COMMONS_BUCKETS.at(-1)!;
         const buckets = COMMONS_BUCKETS.filter((w) => w < intrinsic);
-        const candidates = [...buckets.map((w) => `${variant(w)} ${w}w`), `${original} ${intrinsic}w`];
+        const withOriginal = intrinsic < top;
+        const candidates = [...buckets.map((w) => `${variant(w)} ${w}w`), ...(withOriginal ? [`${original} ${intrinsic}w`] : [])];
         const start = buckets.includes(current) ? current : buckets.filter((w) => w <= 960).at(-1);
-        return { src: start ? variant(start) : original, srcSet: candidates.join(', '), maxWidth: intrinsic };
+        return { src: start ? variant(start) : original, srcSet: candidates.join(', '), maxWidth: withOriginal ? intrinsic : top };
       }
       const start = COMMONS_BUCKETS.includes(current) ? current : 960;
       return {
@@ -210,22 +234,58 @@ export function heroResolutionScore(src?: string | null): number {
   return bestRendition(src).maxWidth ?? 800;
 }
 
-/** next.config.ts `images.deviceSizes`; the optimizer answers 400 for any other width. */
-const OPTIMIZER_WIDTHS = [390, 640, 828, 1080, 1280, 1440, 1920, 2560];
-/** News publisher hosts listed in next.config.ts `images.remotePatterns`. */
+/**
+ * next.config.ts `images.imageSizes` (384) + `deviceSizes`; the optimizer answers 400 for any other width.
+ * Kept short on purpose (review 2026-11-01, finding 4): every width is one more transformation per
+ * photo on the Vercel plan. 384 fits a phone list card at dpr 1-2 and a desktop thumb, 640 a card at
+ * dpr 2, 1080 a full-width phone hero at dpr 3, 1440 a desktop lead card at dpr 2, 1920 the bleed.
+ */
+export const OPTIMIZER_WIDTHS = [384, 640, 1080, 1440, 1920] as const;
+/** A first-party Commons bucket thumb (lib/commons-proxy): `/media/commons/thumb/a/ab/File/960px-File`. */
+const COMMONS_THUMB = /^\/media\/commons\/thumb\/[^?#]+\/(\d+)px-[^/?#]+$/;
+
+/** True for a first-party Commons bucket thumb (served as Wikimedia's own bucket renditions, never optimized). */
+export function isCommonsThumb(src: string): boolean {
+  return COMMONS_THUMB.test(src);
+}
+/**
+ * News publisher hosts listed in next.config.ts `images.remotePatterns` whose photos come as large
+ * JPEGs only, so the optimizer earns its transformation. YouTube is not here: it serves 320/480/640/
+ * 1280 renditions itself (bestRendition offers them as a srcset), so a poster costs no transformation.
+ */
 const OPTIMIZER_HOST = /^(?:cdn-\d+\.motorsport\.com|storage\.ghost\.io|i\.guim\.co\.uk)$/;
 
 /**
- * The same picture through the Next image optimizer (resized, AVIF/WebP), for an LCP photo
- * whose publisher serves only large JPEGs. The publisher's own rendition stays the fallback,
- * so a refused or failed optimization still shows the photo.
+ * A Commons bucket thumb as Wikimedia's own bucket renditions (330/500/960/1280/1920, through the
+ * first-party proxy), never wider than the bucket the page chose (that one is known to exist for
+ * the original). The browser picks the smallest bucket that covers the frame; no optimizer pass.
+ */
+export function commonsBucketRendition(r: Rendition): Rendition {
+  const match = r.src.match(COMMONS_THUMB);
+  if (!match) return r;
+  const source = Number(match[1]);
+  const list = (r.srcSet ?? '').split(',').map((c) => c.trim()).filter(Boolean)
+    .filter((c) => { const w = Number(c.match(/\s(\d+)w$/)?.[1]); return Number.isFinite(w) && w <= source; });
+  return { src: r.src, ...(list.length > 1 ? { srcSet: list.join(', ') } : {}), maxWidth: source, ...(r.fallbacks ? { fallbacks: r.fallbacks } : {}) };
+}
+
+/**
+ * The same picture through the Next image optimizer (resized, WebP), for a publisher photo whose
+ * host serves only large JPEGs. The publisher's own rendition stays the fallback, so a refused or
+ * failed optimization still shows the photo. Hosts with right-sized renditions of their own
+ * (Commons buckets, YouTube, F1 media Cloudinary) are returned without the optimizer.
  */
 export function optimizedRendition(r: Rendition): Rendition {
+  // Commons (audit 2026-11-01 DRV-6, review finding 4): the bucket renditions right-size the photo
+  // without spending a transformation; the srcset stops at the bucket the page chose.
+  if (COMMONS_THUMB.test(r.src)) return commonsBucketRendition(r);
   let host: string;
   try { host = new URL(r.src).hostname; } catch { return r; }
   if (!OPTIMIZER_HOST.test(host)) return r;
   const cover = OPTIMIZER_WIDTHS.find((w) => w >= (r.maxWidth ?? 1920)) ?? OPTIMIZER_WIDTHS.at(-1)!;
   const widths = OPTIMIZER_WIDTHS.filter((w) => w <= cover);
   const at = (w: number) => `/_next/image?url=${encodeURIComponent(r.src)}&w=${w}&q=75`;
-  return { src: at(cover), srcSet: widths.map((w) => `${at(w)} ${w}w`).join(', '), maxWidth: r.maxWidth, fallbacks: [r.src, ...(r.fallbacks ?? [])] };
+  // The optimizer never enlarges: the covering width is labelled with the photo's real width.
+  const label = (w: number) => (r.maxWidth ? Math.min(w, r.maxWidth) : w);
+  return { src: at(cover), srcSet: widths.map((w) => `${at(w)} ${label(w)}w`).join(', '), maxWidth: r.maxWidth, fallbacks: [r.src, ...(r.fallbacks ?? [])] };
 }

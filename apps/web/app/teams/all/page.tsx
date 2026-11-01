@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { withSocial } from '@/lib/page-metadata';
 import { outageConnection } from '@/lib/outage-connection';
 import '@/components/brand-c/brand-c.css';
@@ -6,7 +7,6 @@ import '@/components/teams/carbon/teams.css';
 import { PeopleUnavailable } from '@/components/drivers/PeopleUnavailable';
 import { readPublicSport, SPORT_READ_OPTIONS } from '@/lib/public-sport';
 import { jolpica } from '@apex/api-client/jolpica';
-import { scalarPublicQuery } from '@/lib/public-query';
 import { getConstructorStandings, getConstructorStandingsSeason } from '@/lib/grid';
 import { getSeasonContext } from '@/lib/season';
 import { teamColorBySlug } from '@/lib/format';
@@ -16,7 +16,7 @@ import { getPeopleColours } from '@/components/drivers/data/people-data';
 import { cleanName, indexLetter, searchKey } from '@/components/drivers/people';
 import { PressLink } from '@/components/brand-c/Press';
 import { fitDisplay, Kicker } from '@/components/teams/carbon/parts';
-import { TeamDirectory, type TeamDirectoryItem } from '@/components/teams/directory/TeamDirectory';
+import { TeamDirectory, TeamDirectoryFallback, type TeamDirectoryItem } from '@/components/teams/directory/TeamDirectory';
 
 export const revalidate = 86400;
 const DIRECTORY_READ = { deadlineMs: 60_000, timeoutMs: 10_000 } as const;
@@ -27,9 +27,10 @@ export const metadata: Metadata = withSocial({
   alternates: { canonical: '/teams/all' },
 });
 
-export default async function ConstructorDirectoryPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
-  const { q: rawQuery } = await searchParams;
-  const q = scalarPublicQuery(rawQuery) ?? '';
+// Static ISR (audit 2026-11-01 TEAMS-1): the query string is never read on the server; ?q=, ?letter=, ?nationality= and ?show=
+// are read by the directory on the client, so the page is served from cache instead of re-reading
+// every constructor, the standings and the archive on each visit.
+export default async function ConstructorDirectoryPage() {
   const ctx = await getSeasonContext();
   const [read, standings, table, colours, archive] = await Promise.all([
     readPublicSport(() => jolpica.getAllConstructors({ ...SPORT_READ_OPTIONS, ...DIRECTORY_READ, revalidate: 86400 })),
@@ -84,7 +85,9 @@ export default async function ConstructorDirectoryPage({ searchParams }: { searc
         {items.length === 0 ? (
           <p className="text-[color:var(--bc-silver)]">No constructors to show right now. Please check back in a few minutes.</p>
         ) : (
-          <TeamDirectory key={q} items={items} season={table.season} titlesKnown={titlesKnown} />
+          <Suspense fallback={<TeamDirectoryFallback items={items} season={table.season} titlesKnown={titlesKnown} />}>
+            <TeamDirectory items={items} season={table.season} titlesKnown={titlesKnown} />
+          </Suspense>
         )}
       </div>
     </div>

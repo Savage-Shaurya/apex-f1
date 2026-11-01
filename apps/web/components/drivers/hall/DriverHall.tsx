@@ -134,7 +134,8 @@ function Exhibit({ e, showPhoto, titleNo, titles }: { e: HallEntry; showPhoto: b
         {picture?.kind === 'cutout' ? (
           <LitPortrait src={picture.src} name={e.name} alt={`${e.name}, ${e.year} world champion`} framing="bust" ratio="4 / 5" sizes="(max-width: 480px) 80vw, (max-width: 1024px) 40vw, 20vw" />
         ) : picture?.kind === 'photo' ? (
-          <Media src={picture.src} alt={`${e.name}`} kind="portrait" sizes="(max-width: 480px) 80vw, (max-width: 1024px) 40vw, 20vw" />
+          // DRV-7: F1's 2019-2023 season portraits are square masters; a square frame keeps the head off the top edge.
+          <Media src={picture.src} alt={`${e.name}`} kind="portrait" ratio={picture.yearSpecific ? '1 / 1' : undefined} sizes="(max-width: 480px) 80vw, (max-width: 1024px) 40vw, 20vw" />
         ) : (
           <TitlePlate n={titleNo ?? 1} of={titles} name={e.name} year={e.year} />
         )}

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { RssItem } from '@apex/api-client/rss';
-import { HERO_MAX_SLIDES, HERO_MIN_SLIDES, autoAdvances, selectHeroSlides, stepSlide } from './news-hero';
+import { HERO_MAX_SLIDES, HERO_MIN_SLIDES, HERO_POOL, autoAdvances, heroImageWidth, heroPhotoMode, selectHeroSlides, stepSlide } from './news-hero';
 
 // Test fixtures only: shaped like feed rows from the curated F1 newsrooms, never rendered.
 const NOW = Date.UTC(2026, 9, 26, 12, 0, 0);
@@ -119,14 +119,93 @@ test('stepping wraps around both ends', () => {
   assert.equal(stepSlide(0, 1, 0), 0);
 });
 
-test('every hero photo fills the full-bleed frame, even on a 2x screen (no scale-down strip at the edge)', async () => {
-  // Publisher photos top out at 1200 px; without allowUpscale SmartImage scales them down on
-  // Retina screens and the striped placeholder shows beside the photo (user, 2026-10-26).
+test('hero photos never use the soft guard blindly: the desk runs its own resolution guard (heroPhotoMode)', async () => {
+  // SmartImage's guard reads the density-corrected naturalWidth under srcset and would shrink a sharp
+  // photo on a Retina screen, so the hero keeps allowUpscale (user, 2026-10-26) and instead decides
+  // per slide, from the photo's true width, whether it can fill the frame (audit HNV-2, 2026-11-01).
   const { readFile } = await import('node:fs/promises');
   const source = await readFile(new URL('./NewsDesk.tsx', import.meta.url), 'utf8');
   const images = source.match(/<SmartImage\b[\s\S]*?\/>/g) ?? [];
   assert.ok(images.length >= 2);
   for (const image of images) assert.match(image, /\ballowUpscale\b/);
+  assert.match(source, /heroPhotoMode\(/);
+});
+
+// Real publisher URL shapes (image-renditions rules): The Race 2000 px, motorsport.com s6 1200 px,
+// ESPN states its size in the file name, WordPress originals are of unknown size.
+const GHOST = (n: number) => `https://storage.ghost.io/c/dd/af/x/content/images/2026/10/XPB_${n}_HiRes.jpg`;
+const MSPORT = (n: number) => `https://cdn-1.motorsport.com/images/amp/Id${n}/s6/lewis-hamilton-ferrari.jpg`;
+const ESPN = 'https://a2.espncdn.com/combiner/i?img=%2Fphoto%2F2026%2F0819%2Fr1703751_1296x729_16%2D9.jpg';
+
+test('the true width of each publisher photo is known where the host states it', () => {
+  assert.equal(heroImageWidth(GHOST(1)), 2000);
+  assert.equal(heroImageWidth(MSPORT(1)), 1200);
+  assert.equal(heroImageWidth(ESPN), 1296);
+  assert.equal(heroImageWidth('https://www.planetf1.com/wp-content/uploads/picture-1-1024x683.jpg'), null);
+  assert.equal(heroImageWidth('not a url'), null);
+});
+
+test('hero slides prefer photos that can fill the frame sharply, from the newest stories only', () => {
+  // Newest four are 1200 px motorsport.com photos, the next four 2000 px The Race photos.
+  const feed = Array.from({ length: 12 }, (_, n) => story(n, { imageUrl: n < 4 ? MSPORT(n) : n < 8 ? GHOST(n) : MSPORT(n) }));
+  const slides = selectHeroSlides(feed, NOW)!;
+  assert.equal(slides.length, HERO_MAX_SLIDES);
+  // The first slide (the LCP, the one most people see) is the newest sharp photo.
+  assert.equal(slides[0]!.image, GHOST(4));
+  assert.equal(slides[0]!.imageWidth, 2000);
+  // All four sharp stories are in; the rest are filled from the next newest stories.
+  const sharp = slides.filter((s) => s.imageWidth === 2000);
+  assert.equal(sharp.length, 4);
+  // Never older than the newest HERO_POOL stories.
+  const oldest = Math.min(...slides.map((s) => s.publishedMs));
+  assert.ok(oldest >= NOW - (HERO_POOL - 1) * 10 * MIN);
+  // After the lead, newest first.
+  const rest = slides.slice(1).map((s) => s.publishedMs);
+  assert.deepEqual(rest, [...rest].sort((a, b) => b - a));
+});
+
+test('unknown sizes rank between sharp and known-soft photos; soft photos still fill an otherwise short desk', () => {
+  // Newest five are known-small, then three unknown WordPress originals, then two sharp ones.
+  const feed = Array.from({ length: 10 }, (_, n) => story(n, n < 5 ? { imageUrl: MSPORT(n) } : n >= 8 ? { imageUrl: GHOST(n) } : {}));
+  const slides = selectHeroSlides(feed, NOW)!;
+  // Both sharp and all unknown photos are in; only the three newest small ones fill the rest.
+  assert.deepEqual(slides.map((s) => s.imageWidth), [2000, 1200, 1200, 1200, null, null, null, 2000]);
+  assert.ok(!slides.some((s) => s.image === MSPORT(3) || s.image === MSPORT(4)));
+  const onlySoft = selectHeroSlides([0, 1, 2].map((n) => story(n, { imageUrl: MSPORT(n) })), NOW)!;
+  assert.equal(onlySoft.length, 3);
+  assert.deepEqual(onlySoft.map((s) => s.publishedMs), [0, 1, 2].map((n) => NOW - n * 10 * MIN));
+});
+
+test('on wide screens a photo too small for the full-bleed frame is framed instead of stretched', () => {
+  const frame = { frameWidth: 1440, frameHeight: 760 };
+  // 1200 px at 1440 css, dpr 2: 1200 / 2880 = 0.42, visibly soft.
+  assert.equal(heroPhotoMode({ imageWidth: 1200, dpr: 2, ...frame }), 'framed');
+  assert.equal(heroPhotoMode({ imageWidth: 1296, dpr: 2, ...frame }), 'framed');
+  // 1200 px at dpr 1: 0.83, fine.
+  assert.equal(heroPhotoMode({ imageWidth: 1200, dpr: 1, ...frame }), 'bleed');
+  // 2000 px at 1512 css, dpr 2: 0.66, fine.
+  assert.equal(heroPhotoMode({ imageWidth: 2000, dpr: 2, frameWidth: 1512, frameHeight: 800 }), 'bleed');
+  // A tall frame needs a wider photo (a 3:2 photo covering it is drawn wider than the frame).
+  assert.equal(heroPhotoMode({ imageWidth: 2000, dpr: 1, frameWidth: 1024, frameHeight: 2400 }), 'framed');
+  // Unknown size: never guessed soft.
+  assert.equal(heroPhotoMode({ imageWidth: null, dpr: 3, ...frame }), 'bleed');
+  assert.equal(heroPhotoMode({ imageWidth: 1200, dpr: Number.NaN, ...frame }), 'bleed');
+});
+
+test('below lg the photo sits in its own natural-shape frame, edge to edge, with the headline under it', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('./NewsDesk.tsx', import.meta.url), 'utf8');
+  const css = await readFile(new URL('./brand-c.css', import.meta.url), 'utf8');
+  // The picture frame: its own row, natural 3:2 shape on phones and tablets, full hero from lg.
+  assert.match(source, /data-backdrop className="[^"]*\brow-start-1\b[^"]*\baspect-\[3\/2\][^"]*\blg:aspect-auto\b/);
+  // The copy: the row under the photo on phones, over it from lg.
+  assert.match(source, /data-copy className="[^"]*\brow-start-2\b[^"]*\blg:row-start-1\b/);
+  // The full-screen height only applies from lg.
+  assert.doesNotMatch(source, /className="relative grid[^"]*\s(?<!lg:)min-h-\[/);
+  // The heavy reading scrim only exists where words sit on the photo (lg).
+  assert.match(source, /data-scrim className="[^"]*\bhidden\b[^"]*\blg:block\b/);
+  // No zoom below lg: the photo is drawn at its sharpest.
+  assert.match(css, /@media \(prefers-reduced-motion: no-preference\) and \(min-width: 1024px\) \{\s*\.bc-desk-kb/);
 });
 
 test('rotating stories never change the hero height: every story has an invisible, inert height holder', async () => {

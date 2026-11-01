@@ -137,18 +137,44 @@ function emptySearchProvider() {
 }
 test('search may establish an empty corpus only after all six strict source reads succeed', async () => {
   const fixture = emptySearchProvider();
-  assert.deepEqual(await readSearchCorpus(fixture.provider), { state: 'available', data: [[], [], [], [], [], []] });
+  assert.deepEqual(await readSearchCorpus(fixture.provider), { state: 'available', missing: [], data: { driverStandings: [], constructorStandings: [], schedule: [], allDrivers: [], seasons: [], allConstructors: [] } });
   assert.equal(fixture.options.length, 6); assert.ok(fixture.options.every(options => options.strict && options.signal));
-  assert.deepEqual(await readSearchCorpus({ ...fixture.provider, getAllDrivers: async () => { throw new ProviderError('jolpica', 'invalid-response'); } }), { state: 'unavailable', reason: 'provider' });
 });
 
-test('search whole-operation deadline releases a stalled corpus without declaring no matches', async t => {
+test('VI-01: one failed source leaves search working on the rest and names what is missing', async () => {
+  const fixture = emptySearchProvider();
+  let calls = 0;
+  // Before: any one of the six reads failing showed "Search unavailable" for the whole page.
+  const read = await readSearchCorpus({ ...fixture.provider, getAllDrivers: async () => { calls++; throw new ProviderError('jolpica', 'invalid-response'); } }, { delayMs: 0 });
+  if (read.state === 'unavailable') return assert.fail('search must work on the sources that loaded');
+  assert.equal(read.state, 'partial');
+  assert.deepEqual(read.missing, ['allDrivers']);
+  assert.equal(read.data.allDrivers, null, 'a missing source is null, never an empty list that would claim "no matches"');
+  assert.deepEqual(read.data.driverStandings, []);
+  assert.equal(calls, 2, 'the failed source is retried once');
+  const none = await readSearchCorpus(Object.fromEntries(Object.entries(fixture.provider).map(([k, v]) => [k, typeof v === 'function' && /^get(DriverStandings|ConstructorStandings|Schedule|AllDrivers|Seasons|AllConstructors)$/.test(k) ? async () => { throw new ProviderError('jolpica', 'timeout'); } : v])) as never, { delayMs: 0 });
+  assert.deepEqual(none, { state: 'unavailable', reason: 'provider' });
+});
+
+test('search whole-operation deadline releases a stalled source without declaring no matches', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const fixture = emptySearchProvider();
-  const pending = readSearchCorpus({ ...fixture.provider, getAllDrivers: async () => new Promise(() => {}) });
+  const pending = readSearchCorpus({ ...fixture.provider, getAllDrivers: async () => new Promise(() => {}) }, { attempts: 1 });
   for (let i = 0; i < 5; i++) await Promise.resolve();
   t.mock.timers.tick(20_000);
-  assert.deepEqual(await pending, { state: 'unavailable', reason: 'provider' });
+  const read = await pending;
+  if (read.state === 'unavailable') return assert.fail('search must work on the sources that loaded');
+  assert.equal(read.state, 'partial');
+  assert.deepEqual(read.missing, ['allDrivers']);
+});
+
+test('VI-01: /search is a static ISR page (no searchParams on the server) and query URLs stay out of the index', async () => {
+  const { readFileSync } = await import('node:fs');
+  const page = readFileSync(new URL('../app/search/page.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /searchParams/, 'reading searchParams made every visit a fresh 4 s dynamic render');
+  assert.match(page, /<Suspense/);
+  const config = readFileSync(new URL('../next.config.ts', import.meta.url), 'utf8');
+  assert.match(config, /source: '\/search'[\s\S]{0,200}type: 'query', key: 'q'[\s\S]{0,200}X-Robots-Tag/);
 });
 
 test('D2-COPY-TRUTH-5: unavailable reads carry the real reason', async () => {

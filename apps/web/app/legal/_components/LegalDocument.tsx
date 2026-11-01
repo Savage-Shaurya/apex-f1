@@ -1,4 +1,5 @@
 import '@/components/brand-c/brand-c.css';
+import { CircuitBackdrop } from '@/components/info/CircuitBackdrop';
 import '@/components/info/carbon-light.css';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -48,7 +49,8 @@ export function LegalDocument({ title, current, updated, intro, sections }: { ti
         </nav>
       </Container>
 
-      <Container className="py-[var(--space-block)] pb-[var(--space-section)]">
+      <Container className="relative py-[var(--space-block)] pb-[var(--space-section)]">
+        <CircuitBackdrop circuitId="suzuka" className="absolute right-[var(--page-margin,1.5rem)] top-[var(--space-block)] hidden w-[16rem] min-[1360px]:block" />
         <div className="grid gap-x-12 gap-y-8 lg:grid-cols-[minmax(0,15rem)_minmax(0,var(--measure))] xl:grid-cols-[minmax(0,17rem)_minmax(0,var(--measure))]">
           <header className="min-w-0 lg:col-start-2">
             <Heading level={1} size="display-m">{title}</Heading>

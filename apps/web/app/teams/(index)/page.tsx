@@ -125,7 +125,7 @@ export default async function TeamsIndexPage() {
           </div>
           {top && (
             <div className="min-w-0 lg:col-span-7 lg:row-span-2 lg:row-start-1 lg:self-center">
-              <CarStage src={top.car} alt={season ? `${top.name} ${season} car, side view` : `${top.name} car, side view`} color={top.color} priority sizes="(max-width: 1024px) 96vw, 58vw" />
+              <CarStage src={top.car} alt={season ? `${top.name} ${season} car, side view` : `${top.name} car, side view`} color={top.color} priority sizes="(max-width: 1023px) 96vw, 58vw" />
               <p className="bc-label mt-3 text-center text-[color:var(--bc-titanium)]">Leader · {top.name}{season ? ` · ${season} car` : ''}</p>
             </div>
           )}

@@ -170,6 +170,11 @@ function validateRows(path: string, params: Record<string, string | number>, opt
   return json;
 }
 
+/** True when `fetch` is Next's patched fetch (it marks itself), i.e. a data cache can answer a cached query. */
+function hasNextDataCache(): boolean {
+  return (globalThis.fetch as typeof fetch & { __nextPatched?: boolean }).__nextPatched === true;
+}
+
 async function get<T>(path: string, params: Record<string, string | number> = {}, opts: FetchOpts = {}): Promise<T> {
   let lastGoodKey: string | null = null;
   // Injected transports (tests, cache decoders) never touch the shared snapshot store.
@@ -198,16 +203,22 @@ async function get<T>(path: string, params: Record<string, string | number> = {}
       return stored;
     }
     const token = opts.accessToken ?? process.env.OPENF1_ACCESS_TOKEN;
-    // While a session is live OpenF1 refuses every free request; do not spend
-    // quota re-learning that (injected transports are tests/decoders and are exempt).
-    if (!opts.fetchImpl && !token && (lockoutState.__apexOpenF1LockedUntil ?? 0) > Date.now()) throw new OpenF1LiveSessionLockout();
-    const headers: Record<string, string> = { Accept: 'application/json' };
-    // The bearer token is only ever sent to the real OpenF1 host over HTTPS.
-    if (token && !PROVIDER_BASE.overridden && BASE === OPENF1_DEFAULT_BASE) headers.Authorization = `Bearer ${token}`;
     // A fresh read (revalidate 0: shared-store refreshes, live snapshots) bypasses Next's fetch
     // cache entirely. Through the instrumented fetch it would mark an ISR page dynamic at
     // runtime ("Page changed from static to dynamic") and fail the page instead of refreshing it.
     const fresh = opts.revalidate === 0;
+    // While a session is live OpenF1 refuses every free request; do not spend
+    // quota re-learning that (injected transports are tests/decoders and are exempt).
+    // Inside Next, a cacheable read still goes through Next's fetch with `force-cache`:
+    // the data cache holds the last 200 for this exact query (shared across instances,
+    // no Redis needed) and answers it without a request; only a miss reaches OpenF1
+    // (audit 2026-11-01 SRL-3: the memo skipped that copy and /live/* went blank).
+    // Outside Next there is no data cache, so the read is refused without a request.
+    const lockedOut = !opts.fetchImpl && !token && (lockoutState.__apexOpenF1LockedUntil ?? 0) > Date.now();
+    if (lockedOut && (fresh || !hasNextDataCache())) throw new OpenF1LiveSessionLockout();
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    // The bearer token is only ever sent to the real OpenF1 host over HTTPS.
+    if (token && !PROVIDER_BASE.overridden && BASE === OPENF1_DEFAULT_BASE) headers.Authorization = `Bearer ${token}`;
     // When the provider produced this response: its Date header, which a Data
     // Cache hit keeps from the original response. Date.now() would label an
     // hours-old cached body as fetched just now (R3-CODE-8).
@@ -221,13 +232,18 @@ async function get<T>(path: string, params: Record<string, string | number> = {}
     }) as typeof fetch;
     const json = await requestJson<unknown>('openf1', url, {
       headers,
-      ...(fresh ? { cache: 'no-store' } : { next: opts.revalidate !== undefined ? { revalidate: opts.revalidate } : undefined }),
+      ...(fresh ? { cache: 'no-store' } : lockedOut ? { cache: 'force-cache' } : { next: opts.revalidate !== undefined ? { revalidate: opts.revalidate } : undefined }),
     } as RequestInit, { timeoutMs: REQUEST_TIMEOUT_MS, maxBytes: 8_000_000, ...opts, fetchImpl: lockoutAwareFetch(datedFetch) });
     const rows = validateRows(path, params, opts, json);
     const fetchedAt = Date.now();
     // A Date in the future (clock skew) or implausibly old header falls back to the read time.
     const dated = providerDate as number | null;
     const storedAt = dated !== null && dated <= fetchedAt + 5_000 && dated > fetchedAt - 30 * 86_400_000 ? Math.min(dated, fetchedAt) : fetchedAt;
+    if (lockedOut) {
+      // Answered by Next's data cache during the lockout: an earlier response, labelled as such.
+      opts.onProvenance?.({ source: 'last-good', asOf: storedAt, reason: 'live-session-lockout' });
+      return rows as T;
+    }
     if (store) {
       const entry = { version: 1 as const, key: lastGoodKey, storedAt, rows };
       const write = () => store.write(entry).catch(() => undefined);

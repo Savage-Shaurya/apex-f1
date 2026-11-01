@@ -1,4 +1,5 @@
 import '@/components/brand-c/brand-c.css';
+import { CircuitBackdrop } from '@/components/info/CircuitBackdrop';
 import '@/components/info/carbon-light.css';
 import type { Metadata } from 'next';
 import { ArrowLink, ButtonLink, Grid, Heading, Label, Section, Stat, StatGroup, Text } from '@/components/ds';
@@ -64,6 +65,7 @@ export default async function AboutPage() {
             </Text>
           </div>
           <div className="col-span-4 min-w-0 sm:col-span-8 lg:col-span-4 lg:self-end">
+            <CircuitBackdrop circuitId="silverstone" className="mb-6 ml-auto w-[min(100%,20rem)] max-lg:w-[min(55%,12rem)]" />
             <Text tone="muted">
               The calendar, results, the full championship archive, final timing from every session and the latest Formula 1 news,
               together in one place.

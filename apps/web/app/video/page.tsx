@@ -8,7 +8,9 @@ import { StickyRail } from '@/components/news/StickyRail';
 import { plural } from '@/components/news/news-format';
 import { FeaturedVideo, UpNextRow, VideoTile } from '@/components/video/VideoCards';
 import { FocusRail } from '@/components/video/FocusRail';
-import { isOnTopicForChannel, pickFeatured, toVideoView } from '@/components/video/video-model';
+import { isOnTopicForChannel, pickFeatured, playName, playerAttributes, toVideoView, type VideoView } from '@/components/video/video-model';
+import { HeroMosaic } from '@/components/hero/HeroMosaic';
+import { pickHeroTilesFrom, type HeroTile } from '@/components/hero/hero-visual';
 import { scalarPublicQuery } from '@/lib/public-query';
 import { withSocial } from '@/lib/page-metadata';
 import { outageConnection } from '@/lib/outage-connection';
@@ -65,6 +67,10 @@ export default async function VideoPage(props: { searchParams: Promise<{ channel
   const rest = sorted.filter((v) => v !== featured);
   const upNext = rest.slice(0, UP_NEXT);
   const grid = rest.slice(UP_NEXT);
+  // HNV-3: the masthead shows real posters of the newest uploads further down the page (the
+  // featured video and "Up next" sit right under it, so those are not repeated here).
+  const toTile = (v: VideoView): HeroTile | null => (v.thumbnail ? { key: v.key, src: v.thumbnail, href: v.url, title: v.title, meta: v.channel, label: playName(v), attrs: playerAttributes(v) } : null);
+  const heroTiles = pickHeroTilesFrom([grid, upNext], toTile, 3);
 
   const href = (next: { channel?: string | null; sort?: SortKey }) => {
     const sp = new URLSearchParams();
@@ -90,6 +96,7 @@ export default async function VideoPage(props: { searchParams: Promise<{ channel
         kicker={<>Screening room · {plural(directory.length, 'channel')}</>}
         title="Video"
         light={<Floodlights className="absolute inset-0" />}
+        visual={heroTiles.length > 0 ? <HeroMosaic tiles={heroTiles} label="More new uploads" /> : undefined}
       >
         <p className="max-w-[40ch] text-[clamp(1.02rem,0.95rem+0.3vw,1.18rem)] leading-relaxed text-[color:var(--bc-silver)]">
           {sort === 'most-viewed'

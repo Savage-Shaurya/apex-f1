@@ -18,19 +18,26 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { bestRendition, optimizedRendition } from "@/lib/image-renditions";
+import { bestRendition, commonsBucketRendition, isCommonsThumb, optimizedRendition } from "@/lib/image-renditions";
+import { pixelWidth, sharpnessRatio, SOFT_RATIO } from "@/lib/image-measure";
 import { recoverSettledImage } from "@/lib/settled-image";
 
 const WEDGE =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M0 100 L42 0 L58 0 L100 100 L72 100 L50 34 L28 100 Z' fill='%23e10600' fill-opacity='0.22'/%3E%3C/svg%3E\")";
 
 export interface ImageMeasure {
+  /** Intrinsic size as the browser reports it (density-corrected under srcset; the aspect ratio is exact). */
   naturalWidth: number;
   naturalHeight: number;
+  /** Real pixel width of the delivered file (the picked srcset candidate's width). */
+  pixelWidth: number;
   renderedWidth: number;
-  /** naturalWidth / (renderedWidth * dpr). Below ~0.6 reads as soft. */
+  /** pixelWidth / (renderedWidth * min(dpr, 2)). Below 0.5 reads as soft. */
   ratio: number;
 }
+
+/** Lazy images start this far ahead of the viewport, so a fast scroll on a slow link does not outrun them (HNV-4). */
+const NEAR_VIEWPORT = "150% 0px 150% 0px";
 
 export interface SmartImageProps {
   src?: string | null;
@@ -54,7 +61,11 @@ export interface SmartImageProps {
   focal?: string;
   /** Skip the native-scale guard (e.g. decorative textures). */
   allowUpscale?: boolean;
-  /** Serve a news publisher photo through the Next image optimizer first (LCP heroes). */
+  /**
+   * Serve a news publisher photo through the Next image optimizer first (WebP at
+   * the card's width). Commons bucket thumbs always use Wikimedia's own bucket
+   * renditions, capped at the page's bucket (no optimizer; review 2026-11-01).
+   */
   optimize?: boolean;
   onMeasure?: (m: ImageMeasure) => void;
   onFail?: () => void;
@@ -76,6 +87,18 @@ export function normalizeImageSrc(src?: string | null): string | null {
   if (/^data:image\//i.test(t) || t.startsWith("blob:")) return t;
   if (t.startsWith("/")) return t;
   return null;
+}
+
+/**
+ * YouTube answers a missing rendition (maxres, sometimes sd) with a 120x90 grey
+ * stub. Under srcset the stub is reported at a fraction of its slot, so it is
+ * recognised by its 4:3 shape where maxres is 16:9, or by drawing far below its slot.
+ */
+function isYouTubeStub(img: HTMLImageElement, pixels: number, renderedWidth: number): boolean {
+  if (!/ytimg\.com/.test(img.currentSrc)) return false;
+  if (pixels === img.naturalWidth) return img.naturalWidth <= 120; // no srcset: real pixels
+  if (/maxresdefault/.test(img.currentSrc) && img.naturalHeight / img.naturalWidth > 0.7) return true;
+  return renderedWidth > 0 && img.naturalWidth * 4 < renderedWidth;
 }
 
 function FallbackBlock({ alt, className, style, accent }: { alt: string; className?: string; style?: CSSProperties; accent?: string | null }) {
@@ -122,12 +145,19 @@ function ImageContent({
   onMeasure,
   onFail,
 }: SmartImageProps & { src: string }) {
-  const rendition = useMemo(() => (optimize ? optimizedRendition(bestRendition(src)) : bestRendition(src)), [src, optimize]);
+  const rendition = useMemo(() => {
+    const r = bestRendition(src);
+    if (isCommonsThumb(r.src)) return commonsBucketRendition(r);
+    return optimize ? optimizedRendition(r) : r;
+  }, [src, optimize]);
   const chain = useMemo(() => [rendition.src, ...(rendition.fallbacks ?? []), src].filter((v, i, a) => a.indexOf(v) === i), [rendition, src]);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<"loading" | "loaded" | "failed">("loading");
   const [soft, setSoft] = useState(false);
+  const [near, setNear] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
+  /** Real pixel width of the loaded file, kept for the resize recheck. */
+  const pixelsRef = useRef(0);
   // Callers often pass inline callbacks; keep the latest in refs so the settle
   // effect below does not re-run (and re-report) on every parent render.
   const onMeasureRef = useRef(onMeasure);
@@ -154,17 +184,18 @@ function ImageContent({
   const measure = useCallback(() => {
     const img = imgRef.current;
     if (!img || !img.naturalWidth) return;
-    // YouTube answers a missing maxres with a 120x90 grey stub.
-    if (img.naturalWidth <= 120 && /ytimg\.com/.test(img.currentSrc)) {
+    // Under srcset `w`, naturalWidth is the sizes slot, not the file: use the picked candidate's width (RES-5).
+    const pixels = pixelWidth({ naturalWidth: img.naturalWidth, currentSrc: img.currentSrc, srcSet: img.getAttribute("srcset") });
+    const rect = img.getBoundingClientRect();
+    if (isYouTubeStub(img, pixels, rect.width)) {
       advance();
       return;
     }
-    const rect = img.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const ratio = rect.width > 0 ? img.naturalWidth / (rect.width * dpr) : 1;
+    const ratio = sharpnessRatio(pixels, rect.width, window.devicePixelRatio || 1);
+    pixelsRef.current = pixels;
     setStatus("loaded");
-    setSoft(!allowUpscale && resolvedFit === "cover" && ratio < 0.5);
-    onMeasureRef.current?.({ naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight, renderedWidth: rect.width, ratio });
+    setSoft(!allowUpscale && resolvedFit === "cover" && ratio < SOFT_RATIO);
+    onMeasureRef.current?.({ naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight, pixelWidth: pixels, renderedWidth: rect.width, ratio });
   }, [advance, allowUpscale, resolvedFit]);
 
   // Cached successes and failures can both finish before hydration attaches handlers.
@@ -182,9 +213,10 @@ function ImageContent({
     const updateSharpness = () => {
       const renderedWidth = frame.clientWidth;
       if (!renderedWidth || !img.naturalWidth) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const ratio = img.naturalWidth / (renderedWidth * dpr);
-      const nextSoft = !allowUpscale && resolvedFit === "cover" && ratio < 0.5;
+      // A resize can make the browser pick a larger candidate: re-read the picked candidate's width.
+      const pixels = pixelWidth({ naturalWidth: img.naturalWidth, currentSrc: img.currentSrc, srcSet: img.getAttribute("srcset") }) || pixelsRef.current;
+      const ratio = sharpnessRatio(pixels, renderedWidth, window.devicePixelRatio || 1);
+      const nextSoft = !allowUpscale && resolvedFit === "cover" && ratio < SOFT_RATIO;
       setSoft((previous) => previous === nextSoft ? previous : nextSoft);
     };
     const observer = new ResizeObserver(updateSharpness);
@@ -195,6 +227,17 @@ function ImageContent({
       window.removeEventListener("resize", updateSharpness);
     };
   }, [status, current, allowUpscale, resolvedFit]);
+
+  // Start lazy images 1.5 viewports ahead (native lazy loading is outrun by a fast scroll on slow links).
+  useEffect(() => {
+    const img = imgRef.current;
+    if (eager || near || !img || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { setNear(true); io.disconnect(); }
+    }, { rootMargin: NEAR_VIEWPORT });
+    io.observe(img);
+    return () => io.disconnect();
+  }, [eager, near]);
 
   const positioned = /\b(?:absolute|relative|fixed|sticky)\b/.test(className);
   const frameClass = `${className.replace(/\bobject-(?:cover|contain)\b/g, "")} ${positioned ? "" : "relative"} overflow-hidden`;
@@ -230,7 +273,7 @@ function ImageContent({
           // Never hidden while it loads (a slow host must not leave a blank, invisible
           // picture): the frame's colour shows until the browser paints the image.
         }}
-        loading={eager ? "eager" : "lazy"}
+        loading={eager || near ? "eager" : "lazy"}
         fetchPriority={eager ? "high" : "auto"}
         decoding="async"
         referrerPolicy="no-referrer"

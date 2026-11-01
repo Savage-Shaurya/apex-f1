@@ -17,7 +17,8 @@ test('D2-MEDIA-CREDITS-4: Commons candidates never exceed the original width', (
   // Without metadata the previous bucket set is kept.
   assert.equal(bestRendition(PEREZ).maxWidth, 1920);
   const large = bestRendition(PEREZ, { intrinsicWidth: 4000 });
-  assert.ok(large.srcSet!.includes('1920w') && large.srcSet!.endsWith('4000w'));
+  // A 4000 px original is never a candidate (SRL-1, audit 2026-11-01): the 1920 bucket is the top.
+  assert.ok(large.srcSet!.endsWith('1920w') && !large.srcSet!.includes('4000w'));
 });
 
 test('a motorsport.com URL that is already the s6 rendition still offers phone-sized candidates', () => {
@@ -35,10 +36,26 @@ test('the hero photo can go through the Next image optimizer, with the original 
   const s6 = 'https://cdn-3.motorsport.com/images/amp/6VyKX7dY/s6/franco-colapinto-alpine.jpg';
   const optimized = optimizedRendition(bestRendition(s6));
   const at = (w: number) => `/_next/image?url=${encodeURIComponent(s6)}&w=${w}&q=75`;
-  assert.equal(optimized.src, at(1280));
-  // Only configured deviceSizes, never wider than the first size that covers the 1200 px original.
-  assert.equal(optimized.srcSet, [390, 640, 828, 1080, 1280].map((w) => `${at(w)} ${w}w`).join(', '));
+  assert.equal(optimized.src, at(1440));
+  // Only configured widths, never wider than the first size that covers the 1200 px original,
+  // which is labelled with the real 1200 px (the optimizer never enlarges).
+  assert.equal(optimized.srcSet, `${at(384)} 384w, ${at(640)} 640w, ${at(1080)} 1080w, ${at(1440)} 1200w`);
   assert.deepEqual(optimized.fallbacks, [s6]);
   // Same-origin and unknown hosts are left alone (the optimizer only fetches configured hosts).
   assert.equal(optimizedRendition(bestRendition('https://example.com/a.jpg')).src, 'https://example.com/a.jpg');
+});
+
+test('ESPN combiner photos get its own w= renditions (no optimizer pass), capped at the real width', () => {
+  const src = 'https://a2.espncdn.com/combiner/i?img=%2Fphoto%2F2026%2F0819%2Fr1703751_1296x729_16%2D9.jpg';
+  const r = bestRendition(src);
+  assert.equal(r.maxWidth, 1296);
+  const list = (r.srcSet ?? '').split(', ').map((c) => c.split(' '));
+  assert.deepEqual(list.map(([, w]) => w), ['480w', '640w', '960w', '1296w']);
+  assert.match(list[0]![0]!, /^https:\/\/a2\.espncdn\.com\/combiner\/i\?img=%2Fphoto%2F2026%2F0819%2Fr1703751_1296x729_16%2D9\.jpg&w=480$/);
+  assert.equal(r.src, `${src}&w=1296`);
+  assert.deepEqual(r.fallbacks, [src]);
+  // An existing w= is replaced, not doubled.
+  assert.equal(bestRendition(`${src}&w=300`).src, `${src}&w=1296`);
+  // The optimizer is not spent on it.
+  assert.doesNotMatch(optimizedRendition(r).src, /_next\/image/);
 });

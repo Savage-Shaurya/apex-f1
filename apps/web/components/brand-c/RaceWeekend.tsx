@@ -37,7 +37,7 @@ export function RaceWeekend({ data }: { data: BrandCData }) {
     );
   }
   // A phone takes the 500 px bucket (~54 KB) instead of the 1920 px photo (~480 KB).
-  const photo = n.photo ? bestRendition(n.photo.src) : null;
+  const photo = n.photo ? bestRendition(n.photo.src, { intrinsicWidth: n.photo.originalWidth }) : null;
   const first = n.sessions[0]?.iso;
   const dates = first ? `${dayFmt.format(Date.parse(first))} – ${dayFmt.format(Date.parse(n.raceIso))}` : null;
   return (

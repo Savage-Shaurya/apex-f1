@@ -151,6 +151,7 @@ export default async function RaceWeekendPage(props: { params: Promise<RoutePara
         src: hero.src,
         width: hero.width,
         height: hero.height,
+        originalWidth: hero.originalWidth,
         credit: {
           label: `Photo: ${[hero.credit.author, hero.credit.license].filter(Boolean).join(', ') || 'Wikimedia Commons'} (Wikimedia Commons)`,
           href: hero.credit.sourceUrl,
@@ -307,8 +308,12 @@ export default async function RaceWeekendPage(props: { params: Promise<RoutePara
                 {heroPhoto && !photoInHero && (
                   <figure className={geometry ? 'mt-6' : ''}>
                     <div className="relative overflow-hidden rounded-[22px] bg-[color:var(--bc-carbon-2)] ring-1 ring-[color:var(--bc-rule)]" style={{ aspectRatio: heroPhoto.width && heroPhoto.height ? `${heroPhoto.width} / ${heroPhoto.height}` : '16 / 9' }}>
+                      {/* A ~25 KB 330 px thumb under the lazy photo, so the box is never an empty dark field while the
+                          photo arrives on a slow link (audit SRL-6). It is covered by the photo once that paints. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element -- Commons bucket thumb as a placeholder */}
+                      <img data-photo-placeholder src={photoPlaceholder(heroPhoto.src)} alt="" aria-hidden loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
                       {/* eslint-disable-next-line @next/next/no-img-element -- Commons rendition chosen upstream; the box reserves the space */}
-                      <img {...photoRendition(heroPhoto.src, heroPhoto.width)} alt={`Photograph of ${race.circuitName}`} loading="lazy" decoding="async" sizes="(max-width: 1024px) 100vw, 58vw" className="absolute inset-0 h-full w-full object-cover" />
+                      <img {...photoRendition(heroPhoto.src, heroPhoto.originalWidth)} alt={`Photograph of ${race.circuitName}`} loading="lazy" decoding="async" sizes="(max-width: 1024px) 100vw, 58vw" className="absolute inset-0 h-full w-full object-cover" />
                       <div aria-hidden className="absolute inset-0 bg-[linear-gradient(180deg,transparent_60%,rgb(5_5_6/0.8))]" />
                       <figcaption className="absolute inset-x-5 bottom-4">
                         <span className="bc-wide text-[0.9rem] text-white">{race.circuitName}</span>
@@ -398,8 +403,17 @@ function LapLengthByYear({ eras, season, lapKm }: { eras: LayoutEra[] | null; se
   );
 }
 
-/** src + srcSet for a Commons photo, so phones take a small rendition. */
-function photoRendition(src: string, width?: number | null): { src: string; srcSet?: string } {
-  const r = bestRendition(src, { intrinsicWidth: width ?? undefined });
+/**
+ * src + srcSet for a Commons photo, so phones take a small rendition. `originalWidth` is the
+ * Commons original's real width: only real bucket thumbs are offered (audit SRL-1).
+ */
+function photoRendition(src: string, originalWidth?: number | null): { src: string; srcSet?: string } {
+  const r = bestRendition(src, { intrinsicWidth: originalWidth ?? undefined });
   return r.srcSet ? { src: r.src, srcSet: r.srcSet } : { src: r.src };
+}
+
+/** The smallest Commons bucket of the same photo (330 px), used as the placeholder. */
+function photoPlaceholder(src: string): string {
+  const r = bestRendition(src);
+  return r.srcSet?.trim().split(/\s+/)[0] ?? r.src;
 }

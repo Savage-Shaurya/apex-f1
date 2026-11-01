@@ -1,12 +1,11 @@
 import type { Metadata } from 'next';
-import type { CSSProperties } from 'react';
+import { Suspense, type CSSProperties } from 'react';
 import { PeopleUnavailable } from '@/components/drivers/PeopleUnavailable';
 import { readPublicSport, SPORT_READ_OPTIONS } from '@/lib/public-sport';
 import { jolpica } from '@apex/api-client/jolpica';
-import { scalarPublicQuery } from '@/lib/public-query';
 import { loadDriverChampionshipArchive } from '@/components/data/load-championship-archive';
 import { getSeasonContext } from '@/lib/season';
-import { Directory, type DirectoryItem } from '@/components/drivers/Directory';
+import { Directory, DirectoryFallback, type DirectoryItem } from '@/components/drivers/Directory';
 import { indexLetter, searchKey } from '@/components/drivers/people';
 import { withSocial } from '@/lib/page-metadata';
 import { outageConnection } from '@/lib/outage-connection';
@@ -23,9 +22,9 @@ export const metadata: Metadata = withSocial({
   alternates: { canonical: '/drivers/all' },
 });
 
-export default async function DriverDirectoryPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
-  const { q: rawQuery } = await searchParams;
-  const q = scalarPublicQuery(rawQuery) ?? '';
+// Static ISR (audit 2026-11-01, same cause as TEAMS-1): the query string is never read on the server; the filters are read
+// by the directory on the client, so `revalidate` applies and visits are served from cache.
+export default async function DriverDirectoryPage() {
   const [read, seasons] = await Promise.all([
     readPublicSport(() => jolpica.getAllDrivers({ ...SPORT_READ_OPTIONS, ...DIRECTORY_READ, revalidate: 86400 })),
     getSeasonContext(),
@@ -85,7 +84,9 @@ export default async function DriverDirectoryPage({ searchParams }: { searchPara
         {items.length === 0 ? (
           <p className="text-[color:var(--bc-silver)]">No drivers to show right now. Please check back in a few minutes.</p>
         ) : (
-          <Directory key={q} items={items} initialQuery={q} noun="driver" nounPlural="drivers" />
+          <Suspense fallback={<DirectoryFallback items={items} noun="driver" nounPlural="drivers" />}>
+            <Directory items={items} noun="driver" nounPlural="drivers" />
+          </Suspense>
         )}
       </section>
     </CarbonPage>

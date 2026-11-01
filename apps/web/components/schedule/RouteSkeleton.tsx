@@ -3,6 +3,8 @@ import { Section, Skeleton, SkeletonText, LightLoader } from '@/components/ds';
 /**
  * Loading shapes for the racing-data routes (blueprint 13): the title bar and
  * the real row count of each layout, so nothing jumps when data arrives.
+ * Every part is dark (RES-1): the racing pages are night pages, so a light
+ * "paper" block would flash cream over them while they load.
  */
 export function RouteSkeleton({ variant, message }: { variant: 'calendar' | 'weekend' | 'standings' | 'archive'; message: string }) {
   const rows = variant === 'calendar' ? 24 : variant === 'archive' ? 12 : 20;
@@ -21,7 +23,7 @@ export function RouteSkeleton({ variant, message }: { variant: 'calendar' | 'wee
         {variant === 'archive' && <Skeleton className="mt-12 h-44 w-full sm:h-56" />}
         <LightLoader className="mt-10" message={message} />
       </Section>
-      <Section tone="paper" spacing="tight">
+      <Section tone="deep" spacing="tight">
         <Skeleton className="h-10 w-64" />
         <div className="mt-8 max-w-[60rem] space-y-px">
           {Array.from({ length: rows }, (_, i) => <Skeleton key={i} className="h-14 w-full" />)}

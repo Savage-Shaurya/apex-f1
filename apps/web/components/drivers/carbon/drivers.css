@@ -26,6 +26,10 @@
 }
 /* The light layers wait for the picture, so a slow image never shows a lit ghost. */
 .dr-light { transition: opacity 400ms var(--bc-ease); }
+/* The lights mount once the photo has loaded (LitFrame); they fade in as before. */
+@keyframes dr-light-in { from { opacity: 0; } }
+.dr-light { animation: dr-light-in 400ms var(--bc-ease) both; }
+@media (prefers-reduced-motion: reduce) { .dr-light { animation: none; } }
 .dr-lit:has([data-media-state='loading'], [data-media-state='empty']) .dr-light { opacity: 0; }
 
 /* A lit cut-out: 0.5 px edge highlight and a team-colour rim spill behind the subject.

@@ -52,10 +52,28 @@ function subscribePref(l: () => void) { prefListeners.add(l); return () => { pre
  * is inside the directory and not in a text field, never page-wide, and the
  * shortcut has an on/off switch (remembered on this device). Escape clears.
  */
-export function Directory({ items, noun, nounPlural }: { items: DirectoryItem[]; /** Kept for callers; the URL is read directly. */ initialQuery?: string; noun: string; nounPlural: string }) {
+type DirectoryProps = { items: DirectoryItem[]; /** Kept for callers; the URL is read directly. */ initialQuery?: string; noun: string; nounPlural: string };
+type ParamReader = { get(name: string): string | null };
+const NO_PARAMS: ParamReader = { get: () => null };
+
+/**
+ * /drivers/all is a static ISR page (audit 2026-11-01, same cause as TEAMS-1): the
+ * filters come from the address bar on the client. Render inside <Suspense> with
+ * DirectoryFallback (the full directory, unfiltered) as the fallback.
+ */
+export function Directory(props: DirectoryProps) {
+  const params = useSearchParams();
+  return <DirectoryView {...props} params={params} />;
+}
+
+/** Server-rendered stand-in until the address bar is read: everyone, no filter. */
+export function DirectoryFallback(props: DirectoryProps) {
+  return <DirectoryView {...props} params={NO_PARAMS} />;
+}
+
+function DirectoryView({ items, noun, nounPlural, params }: DirectoryProps & { params: ParamReader }) {
   const inputId = useId();
   const natId = useId();
-  const params = useSearchParams();
   // The address bar is the source of truth once the client has it: a missing ?q= is an empty
   // query (R3-CLICK-3), never the server prop of an earlier visit replayed from the router cache.
   const [query, setQuery] = useState(() => initialDirectoryQuery(params));

@@ -35,7 +35,7 @@ function DuelRow({ label, a, b, aText, bText, note }: { label: string; a: number
 function Person({ d, color, align }: { d: LineUpDriver; color: string; align: 'left' | 'right' }) {
   return (
     <div className={`flex min-w-0 flex-col ${align === 'right' ? 'items-end text-right' : ''}`}>
-      <Portrait src={d.cutout ?? d.headshot} fallbackSrc={d.headshot} name={`${d.firstName} ${d.lastName}`} framing="bust" teamColor={color} glare sizes="(max-width: 768px) 45vw, 300px" className="w-full max-w-[19rem]" />
+      <Portrait src={d.cutout ?? d.headshot} fallbackSrc={d.headshot} name={`${d.firstName} ${d.lastName}`} framing="bust" teamColor={color} glare sizes="(max-width: 640px) 45vw, (max-width: 1279px) 24vw, 310px" className="w-full max-w-[19rem]" />
       <p className="mt-4 text-[0.9rem] text-[color:var(--bc-silver)]">{d.firstName}</p>
       <Link href={`/drivers/${d.slug}`} className="bc-wide inline-flex min-h-11 max-w-full items-center break-words text-[clamp(1.1rem,2.4vw,1.6rem)] text-white underline-offset-4 hover:underline">{d.lastName}</Link>
       {(d.points !== null || d.position !== null) && (

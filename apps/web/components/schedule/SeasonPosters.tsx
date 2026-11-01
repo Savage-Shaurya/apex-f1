@@ -5,6 +5,7 @@ import type { CSSProperties } from 'react';
 import { cn } from '@apex/ui';
 import { Countdown } from '@/components/brand-c/live';
 import { useWeekendNow } from '@/components/race/WeekendSchedule';
+import { gridOrder, monthMarkers } from './poster-grid';
 
 export interface PosterRound {
   round: number;
@@ -58,23 +59,28 @@ export function SeasonPosters({ months, rounds, serverNow, winnersUnavailable }:
   const now = useWeekendNow(serverNow);
   const states = posterStates(rounds, now, winnersUnavailable);
   const at = new Map(rounds.map((r, i) => [r.round, i]));
+  // SRL-4: one continuous grid, so a short month never leaves empty columns; the month rides on its first round.
+  const marks = monthMarkers(months);
+  const order = gridOrder(months).filter((n) => at.has(n));
   return (
-    <div className="space-y-12">
-      {months.map(({ month, rounds: list }) => (
-        <section key={month + list[0]} aria-label={month}>
-          <h3 className="bc-label flex items-center gap-3 text-[color:var(--bc-silver)]"><span aria-hidden className="h-px w-6 bg-white/30" />{month}</h3>
-          <ol className="mt-4 grid grid-cols-1 gap-3 min-[30rem]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-            {list.map((n) => {
+    <ol className="grid grid-cols-1 gap-x-3 gap-y-4 min-[30rem]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+            {order.map((n) => {
               const i = at.get(n)!;
               const r = rounds[i]!;
               const st = states[i]!;
               const lit = st === 'won' && r.winner?.color;
+              const mark = marks.get(n);
               return (
-                <li key={r.round} className="min-w-0" data-current={st === 'next' || st === 'live' || undefined}>
+                <li key={r.round} className="flex min-w-0 flex-col" data-current={st === 'next' || st === 'live' || undefined} data-month-start={mark ? '' : undefined}>
+                  {/* The month label line: named on a month's first round, a quiet rule on the rest, so rows stay aligned. */}
+                  <p aria-hidden={mark ? undefined : true} className={cn('bc-label mb-2 flex min-h-[1.1rem] items-center gap-3 text-[color:var(--bc-silver)]', !mark && 'max-[29.99rem]:hidden')}>
+                    <span aria-hidden className={cn('h-px shrink-0', mark ? 'w-6 bg-white/40' : 'w-full bg-white/[0.07]')} />
+                    {mark && <span>{mark}</span>}
+                  </p>
                   <Link
                     href={r.href}
                     className={cn(
-                      'group relative flex h-full min-h-[8.5rem] overflow-hidden rounded-[18px] p-4 ring-1 transition-[box-shadow,transform] duration-300 min-[30rem]:min-h-[17rem] min-[30rem]:flex-col',
+                      'group relative flex flex-1 min-h-[8.5rem] overflow-hidden rounded-[18px] p-4 ring-1 transition-[box-shadow,transform] duration-300 min-[30rem]:min-h-[17rem] min-[30rem]:flex-col',
                       st === 'won' || st === 'awaiting' || st === 'missing' ? 'bg-[color:var(--bc-carbon)] ring-white/10 hover:ring-white/30' : '',
                       st === 'next' || st === 'live' ? 'bg-[color:var(--bc-carbon)] ring-[color:var(--bc-red)]' : '',
                       st === 'upcoming' ? 'ring-white/[0.08] hover:ring-white/25' : '',
@@ -116,9 +122,6 @@ export function SeasonPosters({ months, rounds, serverNow, winnersUnavailable }:
                 </li>
               );
             })}
-          </ol>
-        </section>
-      ))}
-    </div>
+    </ol>
   );
 }

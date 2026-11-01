@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { PeopleUnavailable } from '@/components/drivers/PeopleUnavailable';
 import { loadConstructor } from '@/components/data/load-constructor';
-import { currentTeamParams } from '@/components/teams/data/static-params';
+import { teamPageParams } from '@/components/teams/data/static-params';
 import { loadConstructorChampionshipArchive } from '@/components/data/load-championship-archive';
 import { jolpica, mapConstructor } from '@apex/api-client/jolpica';
 import { readConstructorWindow, readPublicSport, SPORT_READ_OPTIONS } from '@/lib/public-sport';
@@ -14,6 +14,7 @@ import { getSeasonContext, recentSeasonWindow } from '@/lib/season';
 import { getCalendar } from '@/lib/grid';
 import { getStandingsSeason } from '@/lib/grid';
 import { getDriverMedia, getTeamMedia } from '@/lib/f1-media';
+import { getTeamCommonsCar } from '@/components/teams/data/team-photo';
 import { constructorTitlesFromArchive } from '@/lib/constructor-titles';
 import { teamColorBySlug } from '@/lib/format';
 import '@/components/brand-c/brand-c.css';
@@ -35,11 +36,11 @@ import { getPeopleColours, getPeopleGrid, toRaceRows } from '@/components/driver
 import { cleanName, formatPoints, regularPair, secureReferenceUrl, teamMateDuel, yearRuns } from '@/components/drivers/people';
 
 export const revalidate = 300;
-// ISR: the current season's teams are built ahead (cached from the first visit, kept through a
+// ISR: the current season's teams and every constructors' champion are built ahead (cached from the first visit, kept through a
 // provider outage); any other constructor renders on its first visit, then is served from cache
 // for `revalidate` seconds.
 export async function generateStaticParams() {
-  return currentTeamParams();
+  return teamPageParams();
 }
 
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -92,7 +93,12 @@ export default async function TeamProfilePage(props: { params: Promise<{ slug: s
   // Car and logo pictures exist only for a team in the current table (F1 media, 2024 onward).
   const [mediaNow, mediaPrev, mediaPrev2] = me && season !== null
     ? await Promise.all([getTeamMedia(season, c.slug), getTeamMedia(season - 1, c.slug), getTeamMedia(season - 2, c.slug)])
-    : [null, null, null];
+    // TEAMS-2: while the standings read is down, a current team still shows its car and logo (F1 media is keyed by team, not by the table).
+    : standingsRead.state === 'unavailable'
+      ? [await getTeamMedia(seasons.resultsSeason, c.slug).catch(() => null), null, null]
+      : [null, null, null];
+  // TEAMS-3: a team with no F1 media car shows a real, credited Commons photo of its car (credited on /references).
+  const commonsCar = mediaNow?.car ? null : await getTeamCommonsCar(c.slug, name);
   if (windowRead.state === 'unavailable') await outageConnection();
   const windows = windowRead.state === 'available' ? windowRead.data.map((w) => ({ year: w.year, races: toRaceRows(w.races) })) : [];
   const record3 = teamSeasons(windows);
@@ -170,6 +176,7 @@ export default async function TeamProfilePage(props: { params: Promise<{ slug: s
         logo={mediaNow?.logo ?? null}
         car={mediaNow?.car ?? null}
         carAlt={season ? `${name} ${season} car, side view` : `${name} car`}
+        photo={commonsCar ? { src: commonsCar.src, alt: commonsCar.alt } : null}
         crumbs={[{ label: 'Teams', href: '/teams' }, { label: name }]}
         meta={[c.nationality, me ? `${season} season` : 'Not on the current grid'].filter(Boolean)}
         stats={
@@ -224,7 +231,7 @@ export default async function TeamProfilePage(props: { params: Promise<{ slug: s
             <ol className="mt-10 grid grid-cols-1 gap-x-10 gap-y-12 md:grid-cols-2">
               {cars.map((car) => (
                 <li key={car.year} data-rv className="group min-w-0">
-                  <CarStage src={car.url} alt={`${name} ${car.year} car, side view`} color={color} glare sizes="(max-width: 768px) 92vw, 46vw" />
+                  <CarStage src={car.url} alt={`${name} ${car.year} car, side view`} color={color} glare sizes="(max-width: 767px) 92vw, 46vw" />
                   <p className="bc-mono mt-3 text-[1.4rem] text-white">{car.year}</p>
                 </li>
               ))}

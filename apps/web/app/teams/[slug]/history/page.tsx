@@ -5,12 +5,14 @@ import { officialBetter, teamRecordNotes } from '@/lib/provider-notes';
 import { notFound } from 'next/navigation';
 import { PeopleUnavailable } from '@/components/drivers/PeopleUnavailable';
 import { loadConstructor } from '@/components/data/load-constructor';
-import { currentTeamParams } from '@/components/teams/data/static-params';
+import { teamPageParams } from '@/components/teams/data/static-params';
 import { loadConstructorChampionshipArchive } from '@/components/data/load-championship-archive';
 import { mapConstructor } from '@apex/api-client/jolpica';
 import { getSeasonContext } from '@/lib/season';
 import { constructorTitlesFromArchive } from '@/lib/constructor-titles';
 import { teamColorBySlug } from '@/lib/format';
+import { getTeamMedia } from '@/lib/f1-media';
+import { getTeamCommonsCar } from '@/components/teams/data/team-photo';
 import '@/components/brand-c/brand-c.css';
 import '@/components/teams/carbon/teams.css';
 import { PressLink } from '@/components/brand-c/Press';
@@ -24,11 +26,11 @@ import { getPeopleColours } from '@/components/drivers/data/people-data';
 import { cleanName, ordinal, yearRuns } from '@/components/drivers/people';
 
 export const revalidate = 300;
-// ISR: the current season's teams are built ahead (cached from the first visit, kept through a
+// ISR: the current season's teams and every constructors' champion are built ahead (cached from the first visit, kept through a
 // provider outage); any other constructor renders on its first visit, then is served from cache
 // for `revalidate` seconds.
 export async function generateStaticParams() {
-  return currentTeamParams();
+  return teamPageParams();
 }
 
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -57,10 +59,14 @@ export default async function TeamHistoryPage(props: { params: Promise<{ slug: s
   const c = mapConstructor(record.raw);
   const name = cleanName(c.name);
   const ctx = await getSeasonContext();
-  const [colours, standings, archive] = await Promise.all([
+  // TEAMS-2: the same car and logo as the profile (F1 media, current teams only); a historic
+  // team gets its credited Commons car photo instead (TEAMS-3).
+  const [colours, standings, archive, media, commonsCar] = await Promise.all([
     getPeopleColours(),
     loadConstructorStandingsArchive(ctx.resultsSeason, ctx.lastCompletedSeason),
     loadConstructorChampionshipArchive(ctx.lastCompletedSeason),
+    getTeamMedia(ctx.resultsSeason, c.slug).catch(() => ({ car: null, logo: null })),
+    getTeamCommonsCar(c.slug, name),
   ]);
   const neutral = teamColorBySlug(null);
   const colour = teamColorBySlug(c.slug, colours);
@@ -85,9 +91,10 @@ export default async function TeamHistoryPage(props: { params: Promise<{ slug: s
         tab="history"
         name={name}
         color={color}
-        logo={null}
-        car={null}
-        carAlt=""
+        logo={media.logo}
+        car={media.car}
+        carAlt={media.car ? `${name} ${ctx.resultsSeason} car, side view` : ''}
+        photo={!media.car && commonsCar ? { src: commonsCar.src, alt: commonsCar.alt } : null}
         crumbs={[{ label: 'Teams', href: '/teams' }, { label: name, href: `/teams/${c.slug}` }, { label: 'History' }]}
         meta={[c.nationality, span ? `Championship seasons ${span}` : ''].filter(Boolean)}
         stats={rows.length > 0 ? (

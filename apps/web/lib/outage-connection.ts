@@ -10,6 +10,8 @@ import { isBuildPhase } from '../../../packages/api-client/src/build-phase';
  * route's whole window, and the route stays ISR.
  */
 export const BUILD_OUTAGE_REVALIDATE_SECONDS = 60;
+/** Same one-minute life for a render that met an outage at runtime (ISR regeneration or first visit). */
+export const OUTAGE_REVALIDATE_SECONDS = BUILD_OUTAGE_REVALIDATE_SECONDS;
 
 /**
  * "Do not cache this render": a provider is down and the page shows its
@@ -19,9 +21,12 @@ export const BUILD_OUTAGE_REVALIDATE_SECONDS = 60;
  * - ISR render at runtime (a [param] route with generateStaticParams, or a
  *   static route revalidating): Next cannot switch to dynamic there
  *   (`connection()` throws DYNAMIC_SERVER_USAGE and the visitor would get the
- *   generic error page), so it is a no-op: the honest state is cached only
- *   for the route's short revalidate window and the next regeneration reads
- *   the provider again.
+ *   generic error page). The render's revalidate is shortened instead
+ *   (OUTAGE_REVALIDATE_SECONDS): the honest partial state is served for one
+ *   minute, then the next regeneration reads the provider again. Before this
+ *   (audit 2026-11-01 DRV-2, RES-3, TEAMS-10) a degraded render ("Career data
+ *   unavailable", no season chart, a missing season) was cached for the
+ *   route's whole window (5 min to a day) as if it were a good copy.
  * - `next build`: never `connection()`. A dynamic bailout during the build
  *   turned the whole route into a per-request dynamic route for the life of
  *   the deployment (F-03: team pages had no ISR copy to serve in an outage).
@@ -35,7 +40,10 @@ export async function outageConnection(): Promise<void> {
     shortenBuildRevalidate(unit);
     return;
   }
-  if (isRuntimeIsrRender(unit?.type, process.env.NEXT_PHASE)) return;
+  if (isRuntimeIsrRender(unit?.type, process.env.NEXT_PHASE)) {
+    shortenRevalidate(unit, OUTAGE_REVALIDATE_SECONDS);
+    return;
+  }
   await connection();
 }
 
@@ -44,10 +52,16 @@ export function isRuntimeIsrRender(unitType: string | undefined, phase: string |
 }
 
 const warned = new Set<string>();
+/** Lowers (never raises) the revalidate Next collects for this prerender; the route segment's own value is a min too. */
+function shortenRevalidate(unit: ReturnType<typeof workUnitAsyncStorage.getStore>, seconds: number): boolean {
+  if (!unit || !('revalidate' in unit) || typeof unit.revalidate !== 'number') return false;
+  if (unit.type !== 'prerender-legacy' && unit.type !== 'prerender' && unit.type !== 'prerender-client') return false;
+  (unit as { revalidate: number }).revalidate = Math.min(unit.revalidate, seconds);
+  return true;
+}
+
 function shortenBuildRevalidate(unit: ReturnType<typeof workUnitAsyncStorage.getStore>): void {
-  if (!unit || !('revalidate' in unit) || typeof unit.revalidate !== 'number') return;
-  if (unit.type !== 'prerender-legacy' && unit.type !== 'prerender' && unit.type !== 'prerender-client') return;
-  (unit as { revalidate: number }).revalidate = Math.min(unit.revalidate, BUILD_OUTAGE_REVALIDATE_SECONDS);
+  if (!shortenRevalidate(unit, BUILD_OUTAGE_REVALIDATE_SECONDS)) return;
   const route = workAsyncStorage.getStore()?.route ?? 'a route';
   if (!warned.has(route)) {
     warned.add(route);

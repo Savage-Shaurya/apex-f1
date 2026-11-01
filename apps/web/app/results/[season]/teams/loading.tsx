@@ -1,5 +1,5 @@
-import { RouteSkeleton } from '@/components/schedule/RouteSkeleton';
+import { StandingsSkeleton } from '@/components/results/StandingsSkeleton';
 
 export default function Loading() {
-  return <RouteSkeleton variant="standings" message="Loading the championship table" />;
+  return <StandingsSkeleton message="Loading the championship table" />;
 }

@@ -91,3 +91,10 @@ test('the circuit image is the Wikidata P18 of the linked English article', asyn
   assert.equal(url.searchParams.get('sites'), 'enwiki');
   assert.equal(url.searchParams.get('titles'), 'Las Vegas Grand Prix');
 });
+
+test('review 2026-11-01: with throwOnFailure a provider failure rejects, while a missing file is still null', async () => {
+  const failing = (async () => new Response('busy', { status: 429 })) as typeof fetch;
+  await assert.rejects(getCommonsImage('File:X.jpg', { fetchImpl: failing, throwOnFailure: true }));
+  const missing = (async () => new Response(JSON.stringify({ query: { pages: [{ missing: true }] } }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch;
+  assert.equal(await getCommonsImage('File:X.jpg', { fetchImpl: missing, throwOnFailure: true }), null);
+});

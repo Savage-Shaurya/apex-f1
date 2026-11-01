@@ -1,5 +1,6 @@
 import { jolpica } from '@apex/api-client/jolpica';
 import { prebuildable, readCurrentStandings, readDriverIdentity, retryUnavailable, type RetryOptions } from '@/lib/public-sport';
+import { prebuildChampionIds } from '@/lib/championship-snapshot';
 
 type StandingsRead = () => Promise<{ state: 'available' | 'unavailable'; snapshot: { standings: ReadonlyArray<{ Driver: { driverId: string } }> } | null }>;
 
@@ -28,4 +29,21 @@ export async function currentSeasonDriverParams(read: StandingsRead = currentSta
   } catch {
     return [];
   }
+}
+
+/**
+ * Prebuilt paths for /drivers/[slug] (the profile): the current grid, then the
+ * most visited world champions from the committed championship capture (no
+ * provider read to list them): multiple champions and this century's
+ * champions (prebuildChampionIds). A cold champion render waited 11-20 s
+ * (audit 2026-11-01 DRV-1), but prebuilding all 35 cost ~150-250 Jolpica reads
+ * per build and rate-limited a cold deploy (review 2026-11-01, finding 3), so
+ * the rest render on first visit. A champion whose record cannot be read at
+ * build time is left out and renders on first visit.
+ */
+export async function driverProfileParams(read: StandingsRead = currentStandings, retry: RetryOptions = {}, probe: (param: { slug: string }) => Promise<boolean> = read === currentStandings ? driverRecordAnswers : async () => true): Promise<Array<{ slug: string }>> {
+  const current = await currentSeasonDriverParams(read, retry, probe);
+  const have = new Set(current.map((p) => p.slug));
+  const champions = prebuildChampionIds().drivers.filter((id) => validSlug.test(id) && !have.has(id)).map((slug) => ({ slug }));
+  return [...current, ...(await prebuildable(champions, probe))];
 }

@@ -1,4 +1,5 @@
 import '@/components/brand-c/brand-c.css';
+import { CircuitBackdrop } from '@/components/info/CircuitBackdrop';
 import '@/components/info/carbon-light.css';
 import type { Metadata } from 'next';
 import { ArrowLink, Grid, Heading, Icon, Label, Section, Text, TextLink } from '@/components/ds';
@@ -64,6 +65,7 @@ export default function ContactPage() {
               <Text size="small" tone="subtle" className="mt-8 max-w-[40ch]">
                 Each topic opens your email app with the subject filled in.
               </Text>
+              <CircuitBackdrop circuitId="monaco" className="mt-10 hidden w-[min(100%,20rem)] lg:block" />
             </div>
           </div>
 

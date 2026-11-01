@@ -15,6 +15,8 @@ import type { RoundWinner } from './data';
 import { NextRaceSessions } from './NextRaceSessions';
 import { SeasonPicker } from './SeasonPicker';
 import { SeasonPosters, type PosterRound } from './SeasonPosters';
+import { SeasonStrip } from './SeasonStrip';
+import { heroStrip, stripHasOutlines } from './poster-grid';
 
 const isSprint = (r: UiRace) => r.sessions.some((s) => s.kind === 'S');
 /** Circuit-local calendar days (the event's own dates); "(UTC)" only when the circuit's zone is unknown. */
@@ -82,6 +84,13 @@ export function SeasonCalendar(p: SeasonCalendarProps) {
     if (last && last.month === m) last.rounds.push(race.round);
     else months.push({ month: m, rounds: [race.round] });
   });
+  // SRL-2: the hero's picture is the season itself, drawn as its real circuit outlines, the focus round lapped by the comet.
+  const strip = heroStrip(rounds, focus?.round ?? null, now);
+  const focusPoster = focus ? rounds.find((r) => r.round === focus.round) : undefined;
+  const stripFocus = focus && focusPoster?.outline
+    ? { label: `${Date.parse(chronological(focus.sessions)[0]?.iso ?? focus.raceStartIso) <= now ? 'This weekend' : 'Next'} · Round ${focus.round}`, name: focus.circuitName, outline: focusPoster.outline }
+    : null;
+  const showStrip = stripHasOutlines(strip);
   // Re-read the page (winners, the next race) a little after each race start still ahead this season.
   const watch = races.filter((r) => Date.parse(r.raceStartIso) > now).slice(0, 2).flatMap((r) => [r.raceStartIso, new Date(Date.parse(r.raceStartIso) + 3 * 3_600_000).toISOString()]);
 
@@ -112,6 +121,7 @@ export function SeasonCalendar(p: SeasonCalendarProps) {
             </div>
             {races.length > 0 && (
               <div className="min-w-0 lg:col-span-5">
+                {showStrip && <SeasonStrip strip={strip} focus={stripFocus} className="mb-6" />}
                 <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-[18px] bg-[color:var(--bc-rule)] ring-1 ring-[color:var(--bc-rule)]">
                   {[['Run', <>{run}<span className="ml-1 font-text text-[0.8rem] text-[color:var(--bc-titanium)]">/{races.length}</span></>], ['Sprints', sprints], ['Countries', countries]].map(([k, v]) => (
                     <div key={String(k)} className="min-w-0 bg-[color:var(--bc-night)] p-4 md:p-5">

@@ -4,6 +4,8 @@ import { getCalendar } from '@/lib/grid';
 import { getSeasonContext } from '@/lib/season';
 import { loadDriverChampionshipArchive } from '@/components/data/load-championship-archive';
 import { championPortraits } from '@/components/drivers/data/champion-portraits';
+import { teamCarPhoto } from '@/components/teams/data/team-photo';
+import { TEAM_COMMONS_CARS } from '@/lib/team-commons-cars';
 
 /** One Wikimedia Commons photograph the site shows, with the attribution its licence asks for. */
 export interface PhotoCredit {
@@ -21,6 +23,8 @@ export interface PhotoCredit {
 export interface PhotoCredits {
   circuits: PhotoCredit[];
   champions: PhotoCredit[];
+  /** Historic teams' cars on team pages and past champions' cards (TEAMS-3, RES-6). */
+  teams: PhotoCredit[];
   /** False when a lookup failed, so the page can say the list may be incomplete. */
   complete: boolean;
 }
@@ -43,7 +47,8 @@ export function uniqueBySource(list: PhotoCredit[]): PhotoCredit[] {
 /**
  * The Commons photographs Apex shows, read through the very lookups the pages
  * use (the season's circuit photographs on the home and race pages, the
- * champions' portraits in the hall), so the list matches what is on screen.
+ * champions' portraits in the hall, the historic teams' car photographs),
+ * so the list matches what is on screen.
  */
 export async function loadPhotoCredits(): Promise<PhotoCredits> {
   let complete = true;
@@ -82,6 +87,15 @@ export async function loadPhotoCredits(): Promise<PhotoCredits> {
       return [];
     }
   })();
-  const [circuits, champions] = await Promise.all([circuitsP, championsP]);
-  return { circuits: uniqueBySource(circuits), champions: uniqueBySource(champions), complete };
+  const teamsP = (async () => {
+    const list = await Promise.all(Object.entries(TEAM_COMMONS_CARS).map(async ([id, pick]) => {
+      // The same cached lookup (keyed by team id) the team pages and champion cards read.
+      const { image, failed } = await teamCarPhoto(id, pick.car).catch(() => ({ image: null, failed: true }));
+      if (failed) complete = false;
+      return image ? toCredit(pick.car, 'Team pages and past constructors’ champions', image) : null;
+    }));
+    return list.filter((p): p is PhotoCredit => p !== null);
+  })();
+  const [circuits, champions, teams] = await Promise.all([circuitsP, championsP, teamsP]);
+  return { circuits: uniqueBySource(circuits), champions: uniqueBySource(champions), teams: uniqueBySource(teams), complete };
 }

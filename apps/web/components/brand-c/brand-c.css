@@ -168,10 +168,25 @@
 
 /* Home news desk (rotating hero, NewsHero.tsx): the active story's timer bar fills on the
    compositor and its end advances the slide, so there is no JavaScript timer to drift from it.
-   The picture eases out of a slight zoom. Reduced motion: no timer, no zoom, no auto-advance. */
+   From lg the full-bleed picture eases out of a slight zoom; below lg it holds still at its natural
+   shape so it is drawn at full sharpness (audit HNV-1). Reduced motion: no timer, no zoom, no auto-advance. */
 .bc-desk-fill { transform-origin: 0 50%; transform: scaleX(1); }
-@keyframes bc-desk-kb { from { transform: scale(1.06); } to { transform: scale(1); } }
+@keyframes bc-desk-kb { from { transform: scale(1.04); } to { transform: scale(1); } }
 @media (prefers-reduced-motion: no-preference) {
   .bc-desk-fill[data-run] { animation: bc-progress var(--desk-ms, 6000ms) linear both; }
+}
+@media (prefers-reduced-motion: no-preference) and (min-width: 1024px) {
   .bc-desk-kb { animation: bc-desk-kb 9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+}
+
+/* Give back, still light (VI-03): the warm rays rising from below, drawn in CSS for phones,
+   lite devices, reduced motion and the moment before WebGL starts. Bright enough to read on a
+   dark phone screen: a warm pool at the foot, a fan of soft rays, faded out towards the top. */
+.bc-kind-still {
+  background:
+    radial-gradient(ellipse 60% 38% at 50% 104%, rgb(255 160 140 / 0.46), rgb(225 6 0 / 0.20) 48%, transparent 74%),
+    repeating-conic-gradient(from 270deg at 50% 112%, rgb(255 143 122 / 0.15) 0deg 1.6deg, transparent 1.6deg 6.5deg),
+    radial-gradient(ellipse 90% 70% at 50% 110%, rgb(225 6 0 / 0.14), transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 85% 100% at 50% 100%, #000 35%, transparent 82%);
+  mask-image: radial-gradient(ellipse 85% 100% at 50% 100%, #000 35%, transparent 82%);
 }

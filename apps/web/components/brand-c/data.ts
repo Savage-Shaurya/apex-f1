@@ -76,7 +76,8 @@ export interface BrandCData {
     outline: { d: string; width: number; height: number } | null;
     lapLength: string | null;
     weatherSummary: string | null;
-    photo: { src: string; credit: string; href: string } | null;
+    /** `originalWidth`: the Commons original's real width (caps the srcset; never the scaled bucket width). */
+    photo: { src: string; originalWidth?: number | null; credit: string; href: string } | null;
   };
   title: null | { season: number; round: number | null; leader: string; rival: string; gap: number; pointsLeft: number; roundsLeft: number; clinched: boolean };
   standings: Array<Figure & { position: number; points: number; wins: number; gapToLeader: number; headshot: string | null }>;
@@ -221,6 +222,7 @@ export async function loadBrandC(options: { forceNext?: boolean } = {}): Promise
       weatherSummary: weather?.summary ?? null,
       photo: weekend.photo ? {
         src: weekend.photo.src,
+        originalWidth: weekend.photo.originalWidth,
         credit: `${weekend.photo.credit.author ?? 'Wikimedia Commons contributor'}${weekend.photo.credit.license ? `, ${weekend.photo.credit.license}` : ''}`,
         href: weekend.photo.credit.sourceUrl,
       } : null,

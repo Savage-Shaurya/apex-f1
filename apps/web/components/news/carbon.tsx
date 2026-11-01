@@ -30,8 +30,11 @@ function fitFactor(title: ReactNode): number {
  * Page masthead: the floodlight lands on the title from above (static CSS
  * light, the same subject as the home hero's rays), with the page's one
  * factual line beside it. `light` lets a page put its own stage behind it.
+ * `visual` puts the page's real pictures in the right column (HNV-3): the
+ * title and its line stack on the left, so the hero is never type alone on
+ * an empty dark field when the page has real photos to show.
  */
-export function Masthead({ kicker, title, children, light, className }: { kicker: ReactNode; title: ReactNode; children?: ReactNode; light?: ReactNode; className?: string }) {
+export function Masthead({ kicker, title, children, light, visual, className }: { kicker: ReactNode; title: ReactNode; children?: ReactNode; light?: ReactNode; visual?: ReactNode; className?: string }) {
   return (
     <header className={cn('relative isolate overflow-hidden', className)}>
       <div aria-hidden className="absolute inset-0 -z-10">
@@ -40,15 +43,29 @@ export function Masthead({ kicker, title, children, light, className }: { kicker
       </div>
       <div className="ds-container pb-10 pt-[clamp(2.5rem,6vw,5.5rem)] md:pb-14">
         <Kicker className="bc-in-up" >{kicker}</Kicker>
-        <div className="mt-5 grid items-end gap-x-10 gap-y-6 lg:grid-cols-12">
-          {/* Fitted to its column by the longest word (container units), so a title never breaks mid-word at any width. */}
-          <div className="@container min-w-0 lg:col-span-7">
-            <h1 className="bc-display bc-mask" style={{ fontSize: `min(9rem, calc(100cqi / ${fitFactor(title)}))` }}>
-              <span className="bc-in-rise">{title}</span>
-            </h1>
+        {visual ? (
+          <div className="mt-5 grid items-end gap-x-10 gap-y-8 lg:grid-cols-12 lg:items-center">
+            <div className="min-w-0 lg:col-span-6 xl:col-span-7">
+              <div className="@container min-w-0">
+                <h1 className="bc-display bc-mask" style={{ fontSize: `min(9rem, calc(100cqi / ${fitFactor(title)}))` }}>
+                  <span className="bc-in-rise">{title}</span>
+                </h1>
+              </div>
+              {children && <div className="bc-in-up mt-6 min-w-0" style={{ '--d': '180ms' } as React.CSSProperties}>{children}</div>}
+            </div>
+            <div className="bc-in-up min-w-0 lg:col-span-6 xl:col-span-5" style={{ '--d': '240ms' } as React.CSSProperties}>{visual}</div>
           </div>
-          {children && <div className="bc-in-up min-w-0 lg:col-span-5 lg:pb-3" style={{ '--d': '180ms' } as React.CSSProperties}>{children}</div>}
-        </div>
+        ) : (
+          <div className="mt-5 grid items-end gap-x-10 gap-y-6 lg:grid-cols-12">
+            {/* Fitted to its column by the longest word (container units), so a title never breaks mid-word at any width. */}
+            <div className="@container min-w-0 lg:col-span-7">
+              <h1 className="bc-display bc-mask" style={{ fontSize: `min(9rem, calc(100cqi / ${fitFactor(title)}))` }}>
+                <span className="bc-in-rise">{title}</span>
+              </h1>
+            </div>
+            {children && <div className="bc-in-up min-w-0 lg:col-span-5 lg:pb-3" style={{ '--d': '180ms' } as React.CSSProperties}>{children}</div>}
+          </div>
+        )}
       </div>
     </header>
   );
@@ -88,6 +105,20 @@ export function Pager({ page, totalPages, hrefFor, className }: { page: number; 
       </p>
       {page < totalPages ? <PillLink href={hrefFor(page + 1)}>Older <span aria-hidden>→</span></PillLink> : <span />}
     </nav>
+  );
+}
+
+/**
+ * A one-line partial-outage note (HNV-3): a red rule and a muted sentence,
+ * for "some sources are missing" while the page still has its content. The
+ * full CarbonNotice panel is kept for pages with nothing to show.
+ */
+export function InlineNote({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <p role="status" className={cn('flex items-start gap-3 text-[0.88rem] leading-relaxed text-[color:var(--bc-titanium)]', className)}>
+      <span aria-hidden className="mt-[0.7em] h-[2px] w-5 shrink-0 bg-[color:var(--bc-red)]" />
+      <span className="min-w-0">{children}</span>
+    </p>
   );
 }
 

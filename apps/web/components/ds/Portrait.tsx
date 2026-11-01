@@ -5,7 +5,7 @@ import { cn } from '@apex/ui';
 import { SmartImage } from '@/components/shell/SmartImage';
 import { cloudinaryAspect, f1FramedCutout, isPhotograph } from '@/lib/f1-media-urls';
 import { normalizeHex } from './color';
-import { parseRatio, FIT_TOLERANCE } from './media-rules';
+import { parseRatio, photoFraming } from './media-rules';
 import type { MediaCredit } from './Media';
 import { initialsOf } from './initials';
 
@@ -126,12 +126,8 @@ export function Portrait({
   }, [current, loaded, timeoutMs, fail]);
 
   // Photographs cover only when the crop stays within FIT_TOLERANCE; otherwise they are matted whole.
-  let photoFit: 'cover' | 'contain' = 'cover';
-  if (kind === 'photo' && natural && natural.w && natural.h) {
-    const a = natural.w / natural.h;
-    const b = parseRatio(frameRatio);
-    photoFit = Math.abs(a - b) / Math.max(a, b) <= FIT_TOLERANCE ? 'cover' : 'contain';
-  }
+  const framed = kind === 'photo' ? photoFraming(natural ? { width: natural.w, height: natural.h } : null, parseRatio(frameRatio), focal) : null;
+  const photoFit: 'cover' | 'contain' = framed?.fit ?? 'cover';
   const team = normalizeHex(teamColor);
   const fullInset = inset ?? '5% 6% 0';
 
@@ -151,7 +147,8 @@ export function Portrait({
             src={glyph}
             alt=""
             aria-hidden
-            loading={priority ? 'eager' : 'lazy'}
+            // Decorative: never an eager request competing with the LCP portrait (audit DRV-3).
+            loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
             onError={() => setGlyphOk(false)}
@@ -166,7 +163,7 @@ export function Portrait({
             eager={priority}
             sizes={sizes}
             fit={kind === 'photo' ? photoFit : 'contain'}
-            focal={kind === 'photo' ? (photoFit === 'cover' ? focal : '50% 50%') : framing === 'full' ? '50% 100%' : '50% 0%'}
+            focal={kind === 'photo' ? (framed?.focal ?? focal) : framing === 'full' ? '50% 100%' : '50% 0%'}
             accent="transparent"
             allowUpscale={kind === 'cutout'}
             className="absolute inset-0 z-[1]"

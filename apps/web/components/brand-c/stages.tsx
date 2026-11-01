@@ -20,7 +20,7 @@ function ReadyAfterFrames({ ready }: { ready: () => void }) {
 /**
  * Floodlights over the grid: React Bits LightRays from above, cool white,
  * slow, 30 fps. Lazy (mounts near the viewport), paused off-screen and in hidden
- * tabs, DPR capped at 1.25, never on lite devices (touch, <=4 cores, <=4 GB), and the CSS floodlight stays for reduced motion,
+ * tabs, drawn at the screen density (up to 2x, within a pixel budget: rb/pixel-ratio), never on lite devices (touch, <=4 cores, <=4 GB), and the CSS floodlight stays for reduced motion,
  * Save-Data and no-WebGL browsers.
  */
 export function Floodlights({ className }: { className?: string }) {
@@ -48,7 +48,7 @@ export function Floodlights({ className }: { className?: string }) {
             followMouse={false}
             cursorShadow={false}
             clickPulse={false}
-            maxDevicePixelRatio={1.25}
+            maxDevicePixelRatio={2}
             maxFps={30}
             className="absolute inset-0"
           />
@@ -67,7 +67,8 @@ export function Floodlights({ className }: { className?: string }) {
  */
 export function KindLight({ className }: { className?: string }) {
   const lite = useLiteDevice();
-  const still = <div className="absolute inset-0 bg-[radial-gradient(ellipse_40%_70%_at_50%_105%,rgb(255_120_100/0.20),rgb(225_6_0/0.08)_45%,transparent_75%)]" />;
+  // VI-03: the still light is a real fan of rays, not a faint glow, so phones see the same light.
+  const still = <div className="bc-kind-still absolute inset-0" />;
   if (lite) return <div className={className}>{still}</div>;
   return (
     <LazyStage

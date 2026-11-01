@@ -30,6 +30,10 @@
 .tc-lit--key { background: linear-gradient(172deg, rgb(233 240 255 / 0.22) 0%, rgb(233 240 255 / 0.05) 34%, transparent 52%, rgb(0 0 0 / 0.28) 100%); }
 .tc-lit--rim { background: linear-gradient(90deg, color-mix(in srgb, var(--team) 40%, transparent) 0%, transparent 14%, transparent 86%, color-mix(in srgb, var(--team) 34%, transparent) 100%); }
 .tc-reflect { transform: scaleY(-1); opacity: 0.22; mask-image: linear-gradient(to bottom, transparent 55%, rgb(0 0 0 / 0.85) 100%); -webkit-mask-image: linear-gradient(to bottom, transparent 55%, rgb(0 0 0 / 0.85) 100%); }
+/* Lights and reflection mount once the car has loaded (CarStage); a short fade, none with reduced motion. */
+@keyframes tc-light-in { from { opacity: 0; } }
+.tc-lit, .tc-reflect { animation: tc-light-in 400ms ease-out backwards; }
+@media (prefers-reduced-motion: reduce) { .tc-lit, .tc-reflect { animation: none; } }
 
 /* Logo: lit from above, a soft team halo behind it (never a box). */
 .tc-logo { filter: drop-shadow(0 0 18px color-mix(in srgb, var(--team) 40%, transparent)); }
@@ -63,3 +67,6 @@
 @media (prefers-reduced-motion: reduce) {
   .tc-grow, .tc-grow-x { animation: none; }
 }
+
+/* Hero logo sits flush left in its box, aligned with the team name below it (TEAMS-low). */
+.tc-hero-logo .tc-logo { object-position: left center; }

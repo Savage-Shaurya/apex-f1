@@ -87,6 +87,9 @@ export function readFailure(error: unknown, tokenConfigured = false): ReadFailur
   if (!error || typeof error !== 'object') return 'network';
   const e = error as { name?: unknown; reason?: unknown; code?: unknown; status?: unknown };
   if (e.reason === 'locked') return 'locked';
+  // The shared client's own lockout error (it recognised OpenF1's "Live F1 session in progress" refusal text;
+  // audit 2026-11-01 SRL-3: it fell through to 'network' and the pages said the data "could not be loaded").
+  if (e.name === 'OpenF1LiveSessionLockout') return 'locked';
   if (e.reason === 'invalid' || e.code === 'invalid-response' || e.code === 'incomplete') return 'invalid';
   if (e.name === 'ProviderError' && e.code === 'http' && (e.status === 401 || e.status === 403) && !tokenConfigured) return 'locked';
   return 'network';

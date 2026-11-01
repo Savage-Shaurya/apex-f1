@@ -48,7 +48,7 @@ export function GridSlot({ d, priority = false, gap, leaderPoints }: { d: GridSl
             ratio="4 / 5"
             priority={priority}
             glare
-            sizes="(max-width: 640px) 44vw, (max-width: 1024px) 22vw, 240px"
+            sizes="(max-width: 640px) 44vw, (max-width: 1536px) 21vw, 320px"
             className="relative z-[1]"
           />
         </div>

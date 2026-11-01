@@ -6,7 +6,7 @@ import { AnimatePresence, m, useReducedMotion } from 'framer-motion';
 import { cn } from '@apex/ui';
 import { SmartImage } from '@/components/shell/SmartImage';
 import { RelativeTime } from '@/components/news/RelativeTime';
-import { HERO_SLIDE_MS, autoAdvances, stepSlide, type HeroSlide } from './news-hero';
+import { HERO_SLIDE_MS, autoAdvances, heroPhotoMode, stepSlide, type HeroSlide } from './news-hero';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -14,6 +14,10 @@ const noSubscribe = () => () => {};
 /** True once the window load event has fired (all first-view resources, the first photo included). */
 const onPageLoad = (done: () => void) => { window.addEventListener('load', done); return () => window.removeEventListener('load', done); };
 const pageLoaded = () => document.readyState === 'complete';
+/** From lg the photo fills the hero with the words over it; below lg it sits in its own 3:2 frame. */
+const WIDE = '(min-width: 1024px)';
+const BLEED_SIZES = '100vw';
+const FRAMED_SIZES = `${WIDE} 56vw, 100vw`;
 
 /**
  * The home hero's rotating news desk: the newest real Formula 1 stories,
@@ -24,6 +28,10 @@ const pageLoaded = () => document.readyState === 'complete';
  * - The active story's thin timer bar fills on the compositor and its end
  *   advances the slide (no JavaScript interval). It pauses on hover, on
  *   keyboard focus, off-screen and from its own button (WCAG 2.2.2).
+ * - Phones and tablets (below lg): the photo sits edge to edge at its own 3:2 shape, sharp,
+ *   with the headline right under it on black (owner, 2026-11-01). From lg it fills the hero
+ *   with the words over it; a photo too small to fill that frame sharply is shown framed at
+ *   its own shape on the right instead of stretched (heroPhotoMode, audit HNV-2).
  * - Reduced motion: no timer, no zoom, no auto-advance; the controls still work.
  * - Every story links out to the publisher's article, like /latest.
  */
@@ -43,6 +51,47 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
   // "Hydration failed" error before this gate).
   const reducedMotion = (useReducedMotion() ?? false) && hydrated;
   const root = useRef<HTMLElement>(null);
+  const backdrop = useRef<HTMLDivElement>(null);
+  // The full-bleed frame on wide screens (null below lg and in the server HTML: every photo bleeds).
+  const [frame, setFrame] = useState<{ width: number; height: number; dpr: number } | null>(null);
+  // True photo widths measured in the browser, for publishers that do not state them.
+  const [measured, setMeasured] = useState<ReadonlyMap<number, number>>(() => new Map());
+
+  useEffect(() => {
+    const el = backdrop.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const wide = window.matchMedia(WIDE);
+    const read = () => {
+      if (!wide.matches) { setFrame(null); return; }
+      const width = Math.round(el.clientWidth);
+      const height = Math.round(el.clientHeight);
+      const dpr = window.devicePixelRatio || 1;
+      setFrame((prev) => (prev && prev.width === width && prev.height === height && prev.dpr === dpr ? prev : { width, height, dpr }));
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    wide.addEventListener('change', read);
+    return () => { ro.disconnect(); wide.removeEventListener('change', read); };
+  }, []);
+
+  useEffect(() => {
+    const el = backdrop.current;
+    if (!el) return;
+    // Load events do not bubble, but they do pass ancestors in the capture phase.
+    const onLoad = (event: Event) => {
+      const img = event.target;
+      if (!(img instanceof HTMLImageElement)) return;
+      const at = Number(img.closest<HTMLElement>('[data-slide]')?.dataset.slide);
+      if (!Number.isInteger(at) || slides[at]?.imageWidth != null) return;
+      // naturalWidth is density-corrected under srcset; a plain Image of the chosen file is not.
+      const probe = new Image();
+      probe.onload = () => setMeasured((prev) => ((prev.get(at) ?? 0) >= probe.naturalWidth ? prev : new Map(prev).set(at, probe.naturalWidth)));
+      probe.src = img.currentSrc || img.src;
+    };
+    el.addEventListener('load', onLoad, true);
+    return () => el.removeEventListener('load', onLoad, true);
+  }, [slides]);
 
   useEffect(() => {
     const el = root.current;
@@ -61,6 +110,12 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
 
   const slide = slides[index]!;
   const next = stepSlide(index, 1, count);
+  const modeOf = (i: number) =>
+    frame ? heroPhotoMode({ imageWidth: slides[i]!.imageWidth ?? measured.get(i) ?? null, frameWidth: frame.width, frameHeight: frame.height, dpr: frame.dpr }) : 'bleed';
+  const mode = modeOf(index);
+  const nextMode = modeOf(next);
+  // Framed: a 3:2 photo on the right, its left edge fading into the night behind the words.
+  const framedBox = 'absolute right-0 top-1/2 aspect-[3/2] w-[56%] -translate-y-1/2 [mask-image:linear-gradient(90deg,transparent,#000_24%)]';
 
   // One story's copy. Rendered once visibly and once per story as an invisible, inert height
   // holder, so the block is always as tall as the longest story: rotating stories never move
@@ -126,19 +181,21 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
       ref={root}
       aria-roledescription="carousel"
       aria-labelledby="bc-hero-title"
-      className="relative grid grid-cols-[minmax(0,1fr)] min-h-[clamp(500px,calc(100svh-var(--shell-h,64px)-5rem),760px)] lg:min-h-[clamp(560px,calc(100svh-var(--shell-h,64px)-7.5rem),800px)]"
+      className="relative grid grid-cols-[minmax(0,1fr)] lg:min-h-[clamp(560px,calc(100svh-var(--shell-h,64px)-7.5rem),800px)]"
       // A mouse resting on the desk pauses it; a tap on a touch screen must not leave it paused.
       onPointerEnter={(e) => { if (e.pointerType === 'mouse') setHovered(true); }}
       onPointerLeave={(e) => { if (e.pointerType === 'mouse') setHovered(false); }}
       onFocus={(e) => setFocused((e.target as HTMLElement).matches(':focus-visible'))}
       onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false); }}
     >
-      {/* Picture: fills the whole hero edge to edge on every screen, with the words over it
-          (user, 2026-10-26). The grid cell grows with the copy, and the photo grows with the cell. */}
-      <div aria-hidden data-backdrop className="relative col-start-1 row-start-1 overflow-hidden bg-[color:var(--bc-carbon)]">
+      {/* Picture. Below lg: its own row, edge to edge at the photo's 3:2 shape, nothing over it, so it
+          is drawn at its full sharpness with the headline under it (owner, 2026-11-01). From lg: the
+          whole hero, with the words over it (user, 2026-10-26); the cell grows with the copy. */}
+      <div ref={backdrop} aria-hidden data-backdrop className="relative col-start-1 row-start-1 aspect-[3/2] overflow-hidden bg-[color:var(--bc-carbon)] lg:aspect-auto">
         <AnimatePresence initial={false} mode="sync">
           <m.div
             key={index}
+            data-slide={index}
             className="absolute inset-0"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -146,16 +203,18 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
             transition={{ duration: reducedMotion ? 0 : 1.1, ease: EASE }}
           >
             {!failed.has(index) && (
-              <div className="bc-desk-kb absolute inset-0">
+              <div className={mode === 'framed' ? framedBox : 'bc-desk-kb absolute inset-0'} data-photo={mode}>
+                {/* allowUpscale: the desk is its own resolution guard (heroPhotoMode, from the photo's true
+                    width); SmartImage's guard reads a density-corrected width and would shrink sharp photos. */}
                 <SmartImage
                   src={slide.image}
                   alt=""
                   eager={index === 0}
-                  sizes="(max-width: 767px) 160vw, 100vw"
+                  sizes={mode === 'framed' ? FRAMED_SIZES : BLEED_SIZES}
                   fit="cover"
                   allowUpscale
                   optimize
-                  focal="50% 30%"
+                  focal="50% 40%"
                   className="absolute inset-0"
                   onFail={() => markFailed(index)}
                 />
@@ -166,18 +225,21 @@ export function NewsDesk({ slides }: { slides: HeroSlide[] }) {
         {/* The next picture loads behind the current one, so the crossfade never waits on the network.
             It starts after the page load, so it never competes with the first photo (LCP). */}
         {hydrated && loaded && count > 1 && !failed.has(next) && (
-          <div key={`pre-${next}`} className="pointer-events-none absolute inset-0 opacity-0">
-            <SmartImage src={slides[next]!.image} alt="" sizes="(max-width: 767px) 160vw, 100vw" fit="cover" allowUpscale optimize focal="50% 30%" className="absolute inset-0" onFail={() => markFailed(next)} />
+          <div key={`pre-${next}`} data-slide={next} className="pointer-events-none absolute inset-0 opacity-0">
+            <div className={nextMode === 'framed' ? framedBox : 'absolute inset-0'}>
+              <SmartImage src={slides[next]!.image} alt="" sizes={nextMode === 'framed' ? FRAMED_SIZES : BLEED_SIZES} fit="cover" allowUpscale optimize focal="50% 40%" className="absolute inset-0" onFail={() => markFailed(next)} />
+            </div>
           </div>
         )}
-        {/* Scrims keep every word at AA on any photograph. Below lg the copy covers the lower half, so the
-            fade deepens from the middle down; from lg only a soft wash sits behind the text block. */}
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgb(5_5_6/0.2)_0%,transparent_18%,rgb(5_5_6/0.55)_42%,rgb(5_5_6/0.86)_68%,var(--bc-night)_100%)] lg:bg-[radial-gradient(ellipse_70%_85%_at_0%_72%,rgb(5_5_6/0.78)_0%,rgb(5_5_6/0.5)_45%,transparent_100%)]" />
+        {/* Below lg only a short fade joins the photo to the black under it. From lg a soft wash keeps
+            every word over the photo at AA. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[12%] bg-[linear-gradient(0deg,rgb(5_5_6/0.7)_0%,transparent_100%)] lg:hidden" />
+        <div data-scrim className="pointer-events-none absolute inset-0 hidden bg-[radial-gradient(ellipse_70%_85%_at_0%_72%,rgb(5_5_6/0.78)_0%,rgb(5_5_6/0.5)_45%,transparent_100%)] lg:block" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-[30%] bg-[linear-gradient(0deg,var(--bc-night)_0%,rgb(5_5_6/0.6)_40%,transparent_100%)] lg:block" />
       </div>
 
-      <div className="ds-container relative z-[2] col-start-1 row-start-1 flex min-w-0 flex-col justify-end pb-8 pt-28 lg:pb-12">
-        <div className="max-w-[44rem] [text-shadow:0_1px_14px_rgb(5_5_6/0.7)]">
+      <div data-copy className="ds-container relative z-[2] col-start-1 row-start-2 flex min-w-0 flex-col justify-end pb-8 pt-6 lg:row-start-1 lg:pb-12 lg:pt-28">
+        <div className="max-w-[44rem] lg:[text-shadow:0_1px_14px_rgb(5_5_6/0.7)]">
           <h1 id="bc-hero-title" className="bc-label flex flex-wrap items-center gap-x-3 gap-y-1 text-[color:var(--bc-silver)]">
             <span aria-hidden className="h-[2px] w-8 bg-[color:var(--bc-red)]" />
             <span>Latest Formula 1 news</span>

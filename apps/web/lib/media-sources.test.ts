@@ -14,7 +14,9 @@ test('F1 media Cloudinary URLs get a width-rewritten srcset from the same transf
   const r = bestRendition(src);
   assert.equal(r.src, src);
   assert.match(r.srcSet!, /c_fill,g_north,ar_1:1,w_320,q_auto,f_auto\/common\/f1\/2026\/audi\/gabbor01\/2026audigabbor01right\.webp 320w/);
-  assert.match(r.srcSet!, /w_1920,q_auto,f_auto\/.* 1920w$/);
+  // The 3840 px masters are offered up to their full width (TEAMS-4, audit 2026-11-01).
+  assert.match(r.srcSet!, /w_1920,q_auto,f_auto\/.* 1920w, /);
+  assert.match(r.srcSet!, /w_3840,q_auto,f_auto\/.* 3840w$/);
   // SVG logos carry no transform and pass through untouched.
   const logo = 'https://media.formula1.com/image/upload/common/f1/2026/mclaren/2026mclarenlogowhite.svg';
   assert.deepEqual(bestRendition(logo), { src: logo });

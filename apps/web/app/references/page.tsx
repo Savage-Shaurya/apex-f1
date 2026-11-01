@@ -1,13 +1,16 @@
 import type { Metadata } from 'next';
+import { CircuitBackdrop } from '@/components/info/CircuitBackdrop';
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import '@/components/brand-c/brand-c.css';
 import '@/components/info/carbon-light.css';
 import { Eyebrow, SectionTitle, fitDisplay } from '@/components/info/carbon';
 import { loadPhotoCredits, type PhotoCredit } from '@/components/info/photo-credits';
+import { outageConnection } from '@/lib/outage-connection';
 import { BRAND_STATEMENT, NON_AFFILIATION_STATEMENT, REFERENCE_GROUPS, TRADEMARK_NOTICE, type Credit } from '@/lib/credits';
 
-// Photo credits follow the pages' own Commons lookups (cached for a day).
+// Photo credits follow the pages' own Commons lookups (cached for a day). A list a failed lookup
+// left incomplete is kept 60 s (outageConnection), not a day.
 export const revalidate = 86_400;
 
 export const metadata: Metadata = {
@@ -75,7 +78,8 @@ function PhotoRow({ photo }: { photo: PhotoCredit }) {
  */
 export default async function ReferencesPage() {
   const photos = await loadPhotoCredits();
-  const photoCount = photos.circuits.length + photos.champions.length;
+  if (!photos.complete) await outageConnection();
+  const photoCount = photos.circuits.length + photos.champions.length + photos.teams.length;
   const nav = [
     ...REFERENCE_GROUPS.map((g) => ({ id: g.id, title: g.title, count: g.credits.length as number | null })),
     { id: 'photographs', title: 'Photographs', count: photoCount || null },
@@ -94,6 +98,7 @@ export default async function ReferencesPage() {
             <p className="bc-serif bc-in-up mt-7 max-w-[32ch] text-pretty text-[clamp(1.4rem,1.1rem+1.3vw,2.2rem)] leading-[1.25] text-white" style={{ '--d': '180ms' } as CSSProperties}>
               {BRAND_STATEMENT} It stands on the generous work of the people and projects below.
             </p>
+            <CircuitBackdrop circuitId="spa" className="mt-8 w-[min(60%,15rem)] lg:hidden" />
           </div>
           <nav aria-label="On this page" className="bc-in-up min-w-0 lg:col-span-5" style={{ '--d': '240ms' } as CSSProperties}>
             <ul className="bcp-panel overflow-hidden px-5 py-2">
@@ -131,7 +136,7 @@ export default async function ReferencesPage() {
           <div className="min-w-0 lg:col-span-5">
             <div className="lg:sticky lg:top-[calc(var(--nav-offset,0px)+2rem)]">
               <SectionTitle id="photographs-title" title="Photographs">
-                Circuit photographs and champions’ portraits come from Wikimedia Commons. Each one is listed with its photographer and licence, linked to its file page.
+                Circuit photographs, champions’ portraits and historic teams’ cars come from Wikimedia Commons. Each one is listed with its photographer and licence, linked to its file page.
               </SectionTitle>
             </div>
           </div>
@@ -156,6 +161,14 @@ export default async function ReferencesPage() {
                     <h3 className="bc-label mt-12 text-[color:var(--bc-titanium)]">World champions</h3>
                     <ul className="mt-3 border-t border-[color:var(--bc-rule-strong)]">
                       {photos.champions.map((p) => <PhotoRow key={p.sourceUrl} photo={p} />)}
+                    </ul>
+                  </>
+                )}
+                {photos.teams.length > 0 && (
+                  <>
+                    <h3 className="bc-label mt-12 text-[color:var(--bc-titanium)]">Historic teams’ cars</h3>
+                    <ul className="mt-3 border-t border-[color:var(--bc-rule-strong)]">
+                      {photos.teams.map((p) => <PhotoRow key={p.sourceUrl} photo={p} />)}
                     </ul>
                   </>
                 )}

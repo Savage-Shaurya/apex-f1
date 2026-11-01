@@ -29,14 +29,15 @@ import { ResultCell } from '@/components/drivers/ResultCell';
 import { careerSeasons, formatPoints, placeLabel, raceLabel, regularPair, secureReferenceUrl, teamMateDuel, teamsLine, yearRuns, type CareerRace, type CareerSeason } from '@/components/drivers/people';
 import { withSocial } from '@/lib/page-metadata';
 import { outageConnection } from '@/lib/outage-connection';
-import { currentSeasonDriverParams } from '@/components/drivers/static-params';
+import { driverProfileParams } from '@/components/drivers/static-params';
 
 export const revalidate = 300;
-// ISR for every path. The current grid is built ahead so it always has a good copy to serve
-// if a later revalidation meets a provider outage; any other driver renders on first visit and
-// is then served from cache for `revalidate` seconds. Without this export the route renders per request.
+// ISR for every path. The current grid and every world champion are built ahead so each always
+// has a good copy to serve if a later revalidation meets a provider outage; any other driver
+// renders on first visit and is then served from cache for `revalidate` seconds (a render that
+// met an outage for one minute only: outageConnection). Without this export the route renders per request.
 export async function generateStaticParams() {
-  return currentSeasonDriverParams();
+  return driverProfileParams();
 }
 
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -66,33 +67,42 @@ export default async function DriverProfilePage(props: { params: Promise<{ slug:
   // Jolpica keeps http:// Wikipedia links; every outgoing reference uses https (SEO-9).
   const wikiHref = secureReferenceUrl(d.wikiUrl);
 
-  const [wikiSummary, resultsRead, grid, seasons, colours, table] = await Promise.all([
-    d.wikiUrl ? getWikipediaSummaryByUrl(d.wikiUrl, { revalidate: 86400 }) : Promise.resolve(null),
+  // Every read starts as early as its inputs allow (audit 2026-11-01 DRV-1: they ran one after
+  // another, so a cold render took 11-20 s). Wikidata facts and the Commons photo chain on the
+  // Wikipedia summary; the title archive chains on the season context.
+  const wikiRead = d.wikiUrl ? getWikipediaSummaryByUrl(d.wikiUrl, { revalidate: 86400 }) : Promise.resolve(null);
+  const seasonsRead = getSeasonContext();
+  const factsRead = wikiRead.then(async (wiki) => {
+    const wdFacts = wiki?.wikidataId ? await getDriverFactsByQid(wiki.wikidataId, { revalidate: 86400 }) : null;
+    const legacyFacts = !wdFacts && !wiki ? await getDriverFactsFromWikidata(d.fullName, { revalidate: 86400 }) : null;
+    return {
+      qid: wdFacts?.qid ?? legacyFacts?.qid,
+      dob: wdFacts?.dob ?? legacyFacts?.dob,
+      pob: placeLabel(wdFacts?.placeOfBirth ?? legacyFacts?.pob),
+      height: wdFacts?.heightM ?? legacyFacts?.height,
+      image: wdFacts?.imageUrl ?? legacyFacts?.image,
+    };
+  });
+  // Commons photograph: the hero for historic drivers, the biography picture for current ones.
+  const photoRead = Promise.all([wikiRead, factsRead]).then(([wiki, f]) => getCommonsPortrait([f.image, wiki?.originalImageUrl, wiki?.thumbnailUrl], d.fullName));
+  const [wikiSummary, resultsRead, grid, seasons, colours, table, titleArchive, facts, photo] = await Promise.all([
+    wikiRead,
     readPublicSport(() => jolpica.getDriverResults(slug, { ...SPORT_READ_OPTIONS, revalidate: 300 })),
     getPeopleGrid(),
-    getSeasonContext(),
+    seasonsRead,
     getPeopleColours(),
     getStandingsSeason(),
+    seasonsRead.then((ctx) => loadDriverChampionshipArchive(ctx.lastCompletedSeason)),
+    factsRead,
+    photoRead,
   ]);
   if (resultsRead.state === 'unavailable') await outageConnection();
   const resultsOk = resultsRead.state === 'available';
   const races = resultsOk ? toRaceRows(resultsRead.data) : [];
 
-  const wdFacts = wikiSummary?.wikidataId ? await getDriverFactsByQid(wikiSummary.wikidataId, { revalidate: 86400 }) : null;
-  const legacyFacts = !wdFacts && !wikiSummary ? await getDriverFactsFromWikidata(d.fullName, { revalidate: 86400 }) : null;
-  const facts = {
-    qid: wdFacts?.qid ?? legacyFacts?.qid,
-    dob: wdFacts?.dob ?? legacyFacts?.dob,
-    pob: placeLabel(wdFacts?.placeOfBirth ?? legacyFacts?.pob),
-    height: wdFacts?.heightM ?? legacyFacts?.height,
-    image: wdFacts?.imageUrl ?? legacyFacts?.image,
-  };
-
   const career = careerSeasons(races, liveryFor(colours, table.season));
   const careerInputs = races.map((r) => careerInputForRace(r.season, r.rows)).filter((x): x is NonNullable<typeof x> => x !== null);
   const totals = aggregateCareer(careerInputs);
-  const infobox = resultsOk && totals.fastestLaps.coverage !== 'full' && d.wikiUrl ? await getF1InfoboxCareer(d.wikiUrl, { revalidate: 604_800 }) : null;
-  const fastest = fastestLapDisplay(totals, infobox?.fastestLaps);
   const first = career[0];
   const latest = career.at(-1);
 
@@ -102,47 +112,50 @@ export default async function DriverProfilePage(props: { params: Promise<{ slug:
   const teamColor = team?.color ?? null;
   const carNumber = d.number ?? onGrid?.number ?? null;
 
-  const titleArchive = await loadDriverChampionshipArchive(seasons.lastCompletedSeason);
   const titleYears = titleArchive.records.filter((row) => row.winner.Driver.driverId === d.slug).map((row) => row.year);
   const titlesKnown = titleArchive.state !== 'unavailable';
 
-  // Commons photograph: the hero for historic drivers, the biography picture for current ones.
-  const photo = await getCommonsPortrait([facts.image, wikiSummary?.originalImageUrl, wikiSummary?.thumbnailUrl], d.fullName);
   const picture: HeroPicture = onGrid?.cutout
     ? { kind: 'cutout', src: onGrid.cutout, glyph: numberGlyph(onGrid.cutout) }
     : photo
       ? { kind: 'portrait', src: photo.src, credit: commonsCredit(photo.credit) }
       : { kind: 'none' };
 
-  // Team-mate duel for the current season (finished Grands Prix only, from Jolpica).
-  let duel = null as ReturnType<typeof teamMateDuel>;
-  let mate = null as (typeof grid)[number] | null;
-  let mateFallback: { slug: string; firstName: string; lastName: string } | null = null;
-  let mateCutout: string | null = null;
-  if (onGrid && table.season) {
+  // Team-mate duel for the current season (finished Grands Prix only, from Jolpica), read alongside the infobox.
+  const duelRead = async () => {
+    if (!onGrid || !table.season) return null;
     const windowRead = await readConstructorWindow(onGrid.teamSlug, [table.season]);
-    if (windowRead.state === 'available') {
-      const teamRaces = toRaceRows(windowRead.data.flatMap((s) => s.races));
-      const starts = new Map<string, { n: number; first: string; last: string }>();
-      for (const r of teamRaces) for (const row of r.rows) if (row.driver.slug !== d.slug) {
-        const e = starts.get(row.driver.slug) ?? { n: 0, first: row.driver.firstName ?? '', last: row.driver.lastName ?? row.driver.fullName };
-        e.n++;
-        starts.set(row.driver.slug, e);
-      }
-      const pair = regularPair(teamRaces);
-      const mateSlug = pair?.includes(d.slug) ? pair.find((s) => s !== d.slug)! : Array.from(starts.entries()).sort((x, y) => y[1].n - x[1].n)[0]?.[0];
-      if (mateSlug) {
-        duel = teamMateDuel(teamRaces, d.slug, mateSlug);
-        mate = grid.find((g) => g.slug === mateSlug) ?? null;
-        const s = starts.get(mateSlug);
-        mateFallback = { slug: mateSlug, firstName: s?.first ?? '', lastName: s?.last ?? mateSlug };
-        // A team-mate who has since moved team still has a cut-out in this team's kit for the season.
-        mateCutout = mate?.teamSlug === onGrid.teamSlug
-          ? mate.cutout
-          : (await getDriverMedia({ season: table.season, constructorId: onGrid.teamSlug, firstName: mate?.firstName ?? mateFallback.firstName, lastName: mate?.lastName ?? mateFallback.lastName }))?.cutout ?? null;
-      }
+    // No duel and no team-mate photos is a degraded render too: never cached for the full window (DRV-2).
+    if (windowRead.state === 'unavailable') await outageConnection();
+    if (windowRead.state !== 'available') return null;
+    const teamRaces = toRaceRows(windowRead.data.flatMap((s) => s.races));
+    const starts = new Map<string, { n: number; first: string; last: string }>();
+    for (const r of teamRaces) for (const row of r.rows) if (row.driver.slug !== d.slug) {
+      const e = starts.get(row.driver.slug) ?? { n: 0, first: row.driver.firstName ?? '', last: row.driver.lastName ?? row.driver.fullName };
+      e.n++;
+      starts.set(row.driver.slug, e);
     }
-  }
+    const pair = regularPair(teamRaces);
+    const mateSlug = pair?.includes(d.slug) ? pair.find((s) => s !== d.slug)! : Array.from(starts.entries()).sort((x, y) => y[1].n - x[1].n)[0]?.[0];
+    if (!mateSlug) return null;
+    const mate = grid.find((g) => g.slug === mateSlug) ?? null;
+    const s = starts.get(mateSlug);
+    const mateFallback = { slug: mateSlug, firstName: s?.first ?? '', lastName: s?.last ?? mateSlug };
+    // A team-mate who has since moved team still has a cut-out in this team's kit for the season.
+    const mateCutout = mate?.teamSlug === onGrid.teamSlug
+      ? mate.cutout
+      : (await getDriverMedia({ season: table.season, constructorId: onGrid.teamSlug, firstName: mate?.firstName ?? mateFallback.firstName, lastName: mate?.lastName ?? mateFallback.lastName }))?.cutout ?? null;
+    return { duel: teamMateDuel(teamRaces, d.slug, mateSlug), mate, mateFallback, mateCutout };
+  };
+  const [infobox, duelData] = await Promise.all([
+    resultsOk && totals.fastestLaps.coverage !== 'full' && d.wikiUrl ? getF1InfoboxCareer(d.wikiUrl, { revalidate: 604_800 }) : Promise.resolve(null),
+    duelRead(),
+  ]);
+  const fastest = fastestLapDisplay(totals, infobox?.fastestLaps);
+  const duel = duelData?.duel ?? null;
+  const mate = duelData?.mate ?? null;
+  const mateFallback = duelData?.mateFallback ?? null;
+  const mateCutout = duelData?.mateCutout ?? null;
 
   const thisSeason = onGrid && latest && latest.year === table.season ? latest : null;
   const age = currentDriverAge({ dob: d.dob, onCurrentGrid: onGrid !== null, latestSeason: latest?.year, resultsSeason: seasons.resultsSeason, now: seasons.now });

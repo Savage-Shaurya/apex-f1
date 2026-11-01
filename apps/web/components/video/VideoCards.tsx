@@ -78,7 +78,7 @@ export function FeaturedVideo({ v, kicker }: { v: VideoView; kicker?: string }) 
         <div aria-hidden className="pointer-events-none absolute inset-x-0 -top-14 lg:-inset-x-6 bottom-1/2 -z-10 rounded-full bg-[radial-gradient(closest-side,rgb(233_240_255/0.13),transparent)]" />
         {/* The poster repeats the play link for pointer users; keyboard and screen readers use the buttons below. */}
         <a href={v.url} target="_blank" rel="noopener noreferrer" {...playerAttributes(v)} tabIndex={-1} aria-hidden className="block">
-          <VideoPoster src={v.thumbnail} priority radius="l" sizes="(max-width: 1024px) 100vw, 62vw" className="shadow-[0_50px_120px_-50px_rgb(233_240_255/0.35)]">
+          <VideoPoster src={v.thumbnail} priority radius="l" sizes="(max-width: 1023px) 100vw, 62vw" className="shadow-[0_50px_120px_-50px_rgb(233_240_255/0.35)]">
             <span aria-hidden className="absolute inset-0 z-[1] flex items-center justify-center">
               <span className="grid size-16 place-items-center rounded-full bg-[color:var(--bc-red)] text-white shadow-[0_16px_50px_-10px_rgb(225_6_0/0.8)] ring-[10px] ring-black/25 transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover/story:scale-110 motion-reduce:transform-none md:size-20">
                 <PlayGlyph external={!v.embeddable} className="size-7 translate-x-[1px]" />
@@ -119,7 +119,7 @@ export function FeaturedVideo({ v, kicker }: { v: VideoView; kicker?: string }) 
 export function VideoTile({ v }: { v: VideoView }) {
   return (
     <article className="group group/story relative flex min-w-0 flex-col gap-4">
-      <VideoPoster src={v.thumbnail} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 30vw" className="transition-[transform,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/story:-translate-y-1 group-hover/story:shadow-[0_30px_60px_-30px_rgb(233_240_255/0.3)] motion-reduce:transform-none">
+      <VideoPoster src={v.thumbnail} sizes="(max-width: 640px) 100vw, (max-width: 1023px) 50vw, 30vw" className="transition-[transform,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover/story:-translate-y-1 group-hover/story:shadow-[0_30px_60px_-30px_rgb(233_240_255/0.3)] motion-reduce:transform-none">
         <HoverPlay v={v} />
       </VideoPoster>
       <div className="min-w-0">
@@ -141,7 +141,7 @@ export function VideoTile({ v }: { v: VideoView }) {
 export function UpNextRow({ v }: { v: VideoView }) {
   return (
     <article className="group group/story relative grid w-[min(17rem,72vw)] min-w-0 gap-3 lg:w-auto lg:grid-cols-[9.5rem_minmax(0,1fr)] lg:items-start lg:gap-4 lg:py-3.5 xl:grid-cols-[11rem_minmax(0,1fr)]">
-      <VideoPoster src={v.thumbnail} sizes="(max-width: 1024px) 272px, 176px">
+      <VideoPoster src={v.thumbnail} sizes="(max-width: 1023px) 272px, 176px">
         <HoverPlay v={v} size="s" />
       </VideoPoster>
       <div className="min-w-0">

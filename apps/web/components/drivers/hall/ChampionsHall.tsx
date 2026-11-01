@@ -200,7 +200,7 @@ function LeaderPicture({ l }: { l: HallLeader }) {
   if (p.kind === 'car') {
     return (
       <span className="flex flex-col gap-1 pb-2">
-        <Media src={p.src} alt={`${l.name}${l.pictureNote ? `, ${l.pictureNote}` : ''}, side view`} kind="car" ratio="1200 / 264" sizes="(max-width: 640px) 45vw, 16vw" />
+        <Media src={p.src} alt={`${l.name}${l.pictureNote ? `, ${l.pictureNote}` : ''}, side view`} kind="car" ratio="1200 / 264" sizes="(max-width: 640px) 36vw, (max-width: 1023px) 25vw, 12vw" />
         {l.pictureNote && <span className="font-text text-caption text-fg-3">{l.pictureNote}</span>}
       </span>
     );
@@ -213,10 +213,11 @@ function LeaderPicture({ l }: { l: HallLeader }) {
 
 function PlaquePicture({ e, p }: { e: HallEntry; p: NonNullable<HallEntry['picture']> }) {
   if (p.kind === 'cutout' || p.kind === 'photo') {
-    return <Portrait src={p.src} variant={p.kind} framing="bust" name={e.name} teamColor={e.team?.color} glare className="mt-3 min-w-0 w-full" sizes="(max-width: 640px) 136px, (max-width: 1024px) 45vw, (max-width: 1280px) 30vw, 22vw" />;
+    // DRV-7: F1's 2019-2023 season portraits are square masters; a square frame keeps the head off the top edge.
+    return <Portrait src={p.src} variant={p.kind} framing="bust" ratio={p.kind === 'photo' && p.yearSpecific ? '1 / 1' : undefined} name={e.name} teamColor={e.team?.color} glare className="mt-3 min-w-0 w-full" sizes="(max-width: 640px) 136px, (max-width: 1024px) 45vw, (max-width: 1280px) 30vw, 22vw" />;
   }
   if (p.kind === 'car') {
-    return <Media src={p.src} alt={`${e.name} ${e.year} car, side view`} kind="car" ratio="1200 / 264" accent={e.team?.color} className="mt-3" sizes="(max-width: 640px) 90vw, 22vw" />;
+    return <Media src={p.src} alt={`${e.name} ${e.year} car, side view`} kind="car" ratio="1200 / 264" accent={e.team?.color} className="mt-3" sizes="(max-width: 640px) 90vw, (max-width: 1023px) 42vw, (max-width: 1279px) 23vw, 17vw" />;
   }
   if (p.kind === 'logo') {
     return <Media src={p.src} alt={`${e.name} logo`} kind="logo" className="mt-3 w-28" sizes="112px" />;

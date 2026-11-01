@@ -127,7 +127,7 @@ async function Newest({ through }: { through: number }) {
   const titles = rows.filter((r) => r.marque === last.marque).length;
   return (
     <figure className="m-0 min-w-0">
-      {media?.car && <CarStage src={media.car} alt={`${last.name} ${last.year} car, side view`} color={null} priority sizes="(max-width: 1024px) 92vw, 46vw" />}
+      {media?.car && <CarStage src={media.car} alt={`${last.name} ${last.year} car, side view`} color={null} priority sizes="(max-width: 1023px) 92vw, 46vw" />}
       <figcaption className="mt-5 flex flex-wrap items-end justify-between gap-4">
         <span className="min-w-0">
           <span className="bc-label block text-[color:var(--bc-titanium)]">Newest champion</span>

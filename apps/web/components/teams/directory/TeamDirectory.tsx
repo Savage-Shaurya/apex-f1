@@ -58,11 +58,29 @@ const readShow = (v: string | null, titlesKnown: boolean): Show => (v === 'grid'
  * "/" jumps to the search field only when nothing editable has focus, and a
  * visible switch turns it off for good (WCAG 2.1.4; R3-REG-5, R3-CLICK-5).
  */
-export function TeamDirectory({ items, season, titlesKnown }: { items: TeamDirectoryItem[]; season: number | null; titlesKnown: boolean }) {
+type TeamDirectoryProps = { items: TeamDirectoryItem[]; season: number | null; titlesKnown: boolean };
+type ParamReader = { get(name: string): string | null };
+const NO_PARAMS: ParamReader = { get: () => null };
+
+/**
+ * /teams/all is a static ISR page (audit 2026-11-01 TEAMS-1): the filters come
+ * from the address bar on the client. Render inside <Suspense> with
+ * TeamDirectoryFallback (the full directory, unfiltered) as the fallback.
+ */
+export function TeamDirectory(props: TeamDirectoryProps) {
+  const params = useSearchParams();
+  return <TeamDirectoryView {...props} params={params} />;
+}
+
+/** Server-rendered stand-in until the address bar is read: every constructor, no filter. */
+export function TeamDirectoryFallback(props: TeamDirectoryProps) {
+  return <TeamDirectoryView {...props} params={NO_PARAMS} />;
+}
+
+function TeamDirectoryView({ items, season, titlesKnown, params }: TeamDirectoryProps & { params: ParamReader }) {
   const inputId = useId();
   const natId = useId();
   const switchId = useId();
-  const params = useSearchParams();
   const [query, setQuery] = useState(() => params.get('q') ?? '');
   const [letter, setLetter] = useState<string | null>(() => {
     const l = params.get('letter')?.trim().toUpperCase() ?? '';

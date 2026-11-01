@@ -22,17 +22,36 @@ export interface ImageCredit {
 
 export interface CreditedImage {
   src: string;
+  /** Width and height of the bucket thumb in `src` (for the aspect box). */
   width: number | null;
   height: number | null;
+  /**
+   * The Commons original's real pixel width. Renditions must be capped by this,
+   * never by `width` (the scaled bucket), or the multi-megabyte original gets
+   * offered under the bucket's label (audit 2026-11-01 SRL-1).
+   */
+  originalWidth: number | null;
   alt: string;
   credit: ImageCredit;
 }
 
 const LOOKUP_DEADLINE_MS = 4_500;
 
-/** A total render deadline across the dependent provider calls. */
-function withDeadline<T>(work: (signal: AbortSignal) => Promise<T | null>): Promise<T | null> {
-  return new Promise((resolve) => {
+/** Commons did not answer in time or at all (429, timeout, network): not a "no image" answer. */
+export class CommonsLookupError extends Error {
+  constructor(message = 'Wikimedia Commons lookup failed') {
+    super(message);
+    this.name = 'CommonsLookupError';
+  }
+}
+
+/**
+ * A total render deadline across the dependent provider calls. By default a
+ * timeout or failure resolves null; with `strict` it rejects with a
+ * CommonsLookupError so a cached caller does not store the failure.
+ */
+function withDeadline<T>(work: (signal: AbortSignal) => Promise<T | null>, strict = false): Promise<T | null> {
+  return new Promise((resolve, reject) => {
     const abort = new AbortController();
     let settled = false;
     const finish = (value: T | null) => {
@@ -42,8 +61,16 @@ function withDeadline<T>(work: (signal: AbortSignal) => Promise<T | null>): Prom
       abort.abort();
       resolve(value);
     };
-    const timer = setTimeout(() => finish(null), LOOKUP_DEADLINE_MS);
-    void Promise.resolve().then(() => work(abort.signal)).then(finish, () => finish(null));
+    const fail = (error: unknown) => {
+      if (!strict) return finish(null);
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      abort.abort();
+      reject(error instanceof CommonsLookupError ? error : new CommonsLookupError(error instanceof Error ? error.message : undefined));
+    };
+    const timer = setTimeout(() => fail(new CommonsLookupError('Wikimedia Commons lookup timed out')), LOOKUP_DEADLINE_MS);
+    void Promise.resolve().then(() => work(abort.signal)).then(finish, fail);
   });
 }
 
@@ -57,7 +84,7 @@ export function commonsDisplayUrl(fileName: string, width: number, originalWidth
   return upstream ? firstPartyImageUrl(upstream) : null;
 }
 
-function credited(image: CommonsImage, alt: string, width: number): CreditedImage | null {
+export function creditedCommonsImage(image: CommonsImage, alt: string, width: number): CreditedImage | null {
   const src = commonsDisplayUrl(image.fileName, width, image.width);
   if (!src) return null;
   const bucket = commonsBucket(width, image.width);
@@ -66,6 +93,7 @@ function credited(image: CommonsImage, alt: string, width: number): CreditedImag
     src,
     width: image.width ? Math.round(image.width * scale) : null,
     height: image.height ? Math.round(image.height * scale) : null,
+    originalWidth: image.width ?? null,
     alt,
     credit: { author: image.author, license: image.license, licenseUrl: image.licenseUrl, sourceUrl: image.pageUrl },
   };
@@ -137,25 +165,36 @@ export async function getCircuitHeroImage(input: CircuitHeroInput): Promise<Cred
     if (!image || !image.mime?.startsWith('image/') || image.mime === 'image/svg+xml') return null;
     if (!image.width || image.width < 1280) return null;
     if (isOtherSeriesImage(image)) return null;
-    return credited(image, circuitHeroAlt(input.circuitName, image.description), 1920);
+    return creditedCommonsImage(image, circuitHeroAlt(input.circuitName, image.description), 1920);
   });
+}
+
+export interface CommonsPortraitOptions {
+  /**
+   * Reject (CommonsLookupError) when Commons does not answer, instead of
+   * resolving null. Null then only means Commons answered with no usable
+   * image, which a cache may keep; a failure must not be kept.
+   */
+  strict?: boolean;
+  fetchImpl?: typeof fetch;
 }
 
 /**
  * A Commons portrait (Wikidata P18 or the Wikipedia lead image) with its
  * credit. Single-wiki uploads (usually non-free) are rejected.
  */
-export async function getCommonsPortrait(candidates: Array<string | null | undefined>, alt: string, width = 960): Promise<CreditedImage | null> {
+export async function getCommonsPortrait(candidates: Array<string | null | undefined>, alt: string, width = 960, options: CommonsPortraitOptions = {}): Promise<CreditedImage | null> {
   const files = candidates.filter((c): c is string => typeof c === 'string' && c.length > 0);
   if (!files.length) return null;
+  const strict = options.strict === true;
   return withDeadline(async (signal) => {
     for (const candidate of files) {
       if (signal.aborted) return null;
-      const image = await getCommonsImage(candidate, { signal });
+      const image = await getCommonsImage(candidate, { signal, throwOnFailure: strict, ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}) });
       if (!image || !image.mime?.startsWith('image/') || image.mime === 'image/svg+xml') continue;
-      const result = credited(image, alt, width);
+      const result = creditedCommonsImage(image, alt, width);
       if (result) return result;
     }
     return null;
-  });
+  }, strict);
 }

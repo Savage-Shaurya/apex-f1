@@ -29,8 +29,8 @@ test('a transient failure while listing teams is retried, so no team (red_bull, 
 });
 
 for (const file of ['teams/[slug]/(profile)/page.tsx', 'teams/[slug]/history/page.tsx']) {
-  test(`${file} prebuilds the current teams`, () => {
-    assert.match(readFileSync(path.join(app, file), 'utf8'), /generateStaticParams\(\) \{\s*return currentTeamParams\(\);/);
+  test(`${file} prebuilds the current teams (and the champions, TEAMS-6)`, () => {
+    assert.match(readFileSync(path.join(app, file), 'utf8'), /generateStaticParams\(\) \{\s*return teamPageParams\(\);/);
   });
 }
 
@@ -54,4 +54,22 @@ test('F-01: a team whose record cannot be read during the build is left out of t
   const provider = { getConstructors: async () => [{ constructorId: 'ferrari' }, { constructorId: 'mclaren' }, { constructorId: 'haas' }] } as never;
   const probe = async ({ slug }: { slug: string }) => slug !== 'mclaren';
   assert.deepEqual(await currentTeamParams(provider, noWait, probe), [{ slug: 'ferrari' }, { slug: 'haas' }]);
+});
+
+test('TEAMS-6 + review finding 3: team pages prebuild the current teams plus the multiple and recent constructor champions only', async () => {
+  const { teamPageParams } = await import('./static-params');
+  const provider = { getConstructors: async () => [{ constructorId: 'mclaren' }, { constructorId: 'cadillac' }] } as never;
+  const probed: string[] = [];
+  const slugs = (await teamPageParams(provider, {}, async ({ slug }) => { probed.push(slug); return true; })).map((p) => p.slug);
+  assert.deepEqual(slugs.slice(0, 2), ['mclaren', 'cadillac'], 'current teams first');
+  for (const champion of ['ferrari', 'williams', 'team_lotus', 'red_bull', 'mercedes', 'renault', 'brawn']) assert.ok(slugs.includes(champion), champion);
+  // One-off champions from long ago render on first visit instead of costing Jolpica reads at every build.
+  for (const champion of ['brabham-repco', 'tyrrell', 'vanwall', 'matra-ford', 'brm']) assert.ok(!slugs.includes(champion), champion);
+  assert.ok(probed.length <= 10, `at most 10 team records read at build (2 routes each), got ${probed.length}`);
+  assert.equal(slugs.filter((s) => s === 'mclaren').length, 1);
+  // A champion whose record does not answer at build time renders on first visit instead.
+  assert.ok(!(await teamPageParams(provider, {}, async ({ slug }) => slug !== 'brawn')).some((p) => p.slug === 'brawn'));
+  for (const route of ['teams/[slug]/(profile)/page.tsx', 'teams/[slug]/history/page.tsx']) {
+    assert.match(readFileSync(path.join(app, route), 'utf8'), /export async function generateStaticParams\(\)\s*\{\s*return teamPageParams\(\);/, route);
+  }
 });

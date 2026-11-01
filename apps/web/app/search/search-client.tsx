@@ -93,14 +93,7 @@ function ResultRow({ item, query, reserve }: { item: SearchItem; query: string; 
   );
 }
 
-export function SearchClient({
-  items,
-  initialQuery = '',
-  initialKind = 'all',
-  suggestions: suggestionCandidates = [],
-  season = null,
-  label = 'Search drivers, constructors, races and seasons',
-}: {
+type SearchClientProps = {
   items: SearchItem[];
   initialQuery?: string;
   /** From ?type= on a shared link. */
@@ -111,10 +104,37 @@ export function SearchClient({
   season?: number | null;
   /** Visible label for the field (the directory pages reuse this client). */
   label?: string;
-}) {
+  /** Some sources could not be read: "nothing matches" must not sound final. */
+  incomplete?: boolean;
+};
+
+/**
+ * The search, started from the address bar (?q=, ?type=). The page is static, so
+ * this reads the query on the client; render it inside <Suspense> with
+ * SearchClientFallback (the same search with no query) as the fallback.
+ */
+export function SearchClient(props: SearchClientProps) {
   // Start from the address bar, not only the server props: Back to a search
   // replays a cached render whose props still hold the first query.
   const params = useSearchParams();
+  return <SearchView {...props} params={params} />;
+}
+
+/** Server-rendered stand-in until the address bar is read: the full list, nothing typed yet. */
+export function SearchClientFallback(props: SearchClientProps) {
+  return <SearchView {...props} params={null} />;
+}
+
+function SearchView({
+  items,
+  initialQuery = '',
+  initialKind = 'all',
+  suggestions: suggestionCandidates = [],
+  season = null,
+  label = 'Search drivers, constructors, races and seasons',
+  incomplete = false,
+  params,
+}: SearchClientProps & { params: { get(name: string): string | null } | null }) {
   const [start] = useState(() => initialSearchState(params, { query: initialQuery, kind: initialKind }, (k) => items.some((i) => i.kind === k)));
   const [q, setQ] = useState(start.query);
   const [visible, setVisible] = useState(PAGE);
@@ -207,6 +227,7 @@ export function SearchClient({
             <Heading level={2} size="heading-l" caps={false}>Nothing matches “{query}”</Heading>
             <p className="mt-3 max-w-[48ch] font-text text-body text-fg-2">
               {kind !== 'all' ? 'Nothing of this type matches. Try all types, a surname, a constructor, a race location or a season year.' : 'Try a surname, a constructor, a race location or a season year.'}
+              {incomplete ? ' Some records can’t be searched right now, so a match may be missing.' : ''}
             </p>
           </div>
           <div className="lg:col-span-6">

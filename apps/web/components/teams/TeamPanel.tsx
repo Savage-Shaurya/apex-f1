@@ -59,7 +59,7 @@ export function TeamPanel({ t, priority = false }: { t: TeamPanelData; priority?
               priority={priority}
               glare
               field={false}
-              sizes="(max-width: 1024px) 92vw, 54vw"
+              sizes="(max-width: 1023px) 92vw, 54vw"
             />
           </div>
           <div className="min-w-0 lg:col-span-5 lg:row-start-2 lg:self-start">

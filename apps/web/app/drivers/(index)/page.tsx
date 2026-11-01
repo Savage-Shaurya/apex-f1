@@ -46,7 +46,7 @@ function FrontRow({ leader, second }: { leader: GridDriver; second: GridDriver |
       <div aria-hidden className="absolute bottom-[6%] left-1/2 h-[30%] w-[80%] -translate-x-1/2 bg-[radial-gradient(ellipse_50%_70%_at_50%_100%,rgb(233_240_255/0.16),transparent_72%)]" />
       {second && (
         <div data-depth="1" className="absolute bottom-[6%] right-0 w-[52%] opacity-75">
-          <LitPortrait src={second.cutout ?? second.headshot} fallbackSrc={second.headshot} name={`${second.firstName} ${second.lastName}`} teamColor={second.color} framing="bust" ratio="4 / 5" sizes="(max-width: 1024px) 45vw, 300px" />
+          <LitPortrait src={second.cutout ?? second.headshot} fallbackSrc={second.headshot} name={`${second.firstName} ${second.lastName}`} teamColor={second.color} framing="bust" ratio="4 / 5" sizes="(max-width: 1024px) 48vw, 320px" />
           <p className="bc-label absolute bottom-3 right-3 text-[color:var(--bc-silver)]">P2</p>
         </div>
       )}
@@ -54,7 +54,7 @@ function FrontRow({ leader, second }: { leader: GridDriver; second: GridDriver |
         {leader.number !== null && (
           <span aria-hidden className="dr-plane absolute -left-2 -top-4 z-0 text-[clamp(6rem,16vw,12rem)] opacity-50" style={{ '--team': normalizeHex(leader.color) ?? '#9b9ea7' } as CSSProperties}>{leader.number}</span>
         )}
-        <LitPortrait src={leader.cutout ?? leader.headshot} fallbackSrc={leader.headshot} name={`${leader.firstName} ${leader.lastName}`} teamColor={leader.color} framing="bust" ratio="4 / 5" priority sizes="(max-width: 1024px) 60vw, 380px" className="relative z-[1]" />
+        <LitPortrait src={leader.cutout ?? leader.headshot} fallbackSrc={leader.headshot} name={`${leader.firstName} ${leader.lastName}`} teamColor={leader.color} framing="bust" ratio="4 / 5" priority sizes="(max-width: 1024px) 60vw, 400px" className="relative z-[1]" />
         <p className="bc-label absolute bottom-3 left-3 z-[5] text-[color:var(--bc-white)]">P1 · Championship leader</p>
       </div>
     </div>
@@ -165,10 +165,10 @@ export default async function DriversIndexPage({ searchParams }: { searchParams:
               // From 768 it lays out as the two-wide starting grid: even positions sit in the right
               // column, half a slot back, by a transform only, so the DOM order never changes.
               <ol className="mt-10 grid grid-cols-1 gap-x-6 gap-y-5 md:mt-14 md:grid-cols-2 md:gap-y-8 md:pb-40 lg:gap-x-12">
-                {grid.map((d, i) => (
+                {grid.map((d) => (
                   <li key={d.slug} className="min-w-0 md:even:translate-y-[calc(50%+1rem)]">
                     {/* the reveal runs on the inner box: GSAP owns transform there, the stagger offset stays on the li */}
-                    <div data-rv><GridSlot d={d} priority={i < 2} gap={leader ? leader.points - d.points : null} leaderPoints={leader?.points ?? null} /></div>
+                    <div data-rv><GridSlot d={d} gap={leader ? leader.points - d.points : null} leaderPoints={leader?.points ?? null} /></div>
                   </li>
                 ))}
               </ol>

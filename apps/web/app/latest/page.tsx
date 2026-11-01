@@ -9,7 +9,9 @@ import { FilterRail, stickyRailScrollMargin, type FilterItem } from '@/component
 import { StickyRail } from '@/components/news/StickyRail';
 import { WireLead, WireRow, WireSpread, WireTextRow, WireTimeline, type WireStory } from '@/components/news/WireStories';
 import { OriginalsBand } from '@/components/news/OriginalCard';
-import { CarbonNotice, Kicker, Masthead, Pager } from '@/components/news/carbon';
+import { CarbonNotice, InlineNote, Kicker, Masthead, Pager } from '@/components/news/carbon';
+import { HeroMosaic } from '@/components/hero/HeroMosaic';
+import { pickHeroTilesFrom, type HeroTile } from '@/components/hero/hero-visual';
 import { DayStream, type DayEntry } from '@/components/news/DayStream';
 import { RelativeTime } from '@/components/news/RelativeTime';
 import {
@@ -159,6 +161,10 @@ export default async function LatestPage(props: {
       node: slot.slot === 'spread' ? <WireSpread story={story} flip={slot.flip} /> : slot.slot === 'row' ? <WireRow story={story} /> : <WireTextRow story={story} />,
     };
   });
+  // HNV-3: the masthead leads with real photographs: the newest stories after the lead that carry
+  // a publisher picture (the wire list below them is text, so no picture shows twice).
+  const toTile = (st: WireStory): HeroTile | null => (st.imageUrl ? { key: st.href, src: st.imageUrl, href: st.href, title: st.title, meta: st.source } : null);
+  const heroTiles = firstPage ? pickHeroTilesFrom([recent, stream], toTile, 3) : [];
   const newest = stories.reduce((max, s) => Math.max(max, s.publishedMs || 0), 0);
 
   const sourceItems: FilterItem[] = [
@@ -189,6 +195,7 @@ export default async function LatestPage(props: {
       <Masthead
         kicker={<>Paddock wire{stories.length > 0 && <> · {plural(stories.length, 'story', 'stories')} · {plural(newsrooms, 'newsroom')}</>}</>}
         title="Latest"
+        visual={heroTiles.length > 0 ? <HeroMosaic tiles={heroTiles} label="Newest stories with pictures" /> : undefined}
       >
         <p className="max-w-[40ch] text-[clamp(1.02rem,0.95rem+0.3vw,1.18rem)] leading-relaxed text-[color:var(--bc-silver)]">
           Every Formula 1 story worth reading from the newsrooms that cover the sport, newest first. Each one opens in full at its publisher.
@@ -217,10 +224,8 @@ export default async function LatestPage(props: {
       )}
 
       {wire.availability === 'partial' && (
-        <div className="ds-container mt-8">
-          <CarbonNotice tone="unavailable" title="A few stories may be missing">
-            Some newsrooms can’t be reached right now. Everything else is here, newest first.
-          </CarbonNotice>
+        <div className="ds-container mt-5">
+          <InlineNote>A few stories may be missing: some newsrooms can’t be reached right now. Everything else is here, newest first.</InlineNote>
         </div>
       )}
 

@@ -179,16 +179,53 @@ export async function readCurrentStandings<T extends { season: string | null; ro
   return { state: 'available' as const, snapshot: previous.data, previousSeasonFinal: previous.data.standings.length > 0 };
 }
 
-/** Strict mode is required on each public search source; an incomplete corpus cannot establish no matches. */
-export async function readSearchCorpus(provider: typeof jolpica = jolpica) {
-  return readPublicSport(() => withProviderDeadline('jolpica', signal => Promise.all([
-    provider.getDriverStandings('current', { ...SPORT_READ_OPTIONS, signal, revalidate: 1800 }),
-    provider.getConstructorStandings('current', { ...SPORT_READ_OPTIONS, signal, revalidate: 1800 }),
-    provider.getSchedule('current', { ...SPORT_READ_OPTIONS, signal, revalidate: 3600 }),
-    provider.getAllDrivers({ ...SPORT_READ_OPTIONS, signal, revalidate: 86_400 }),
-    provider.getSeasons({ ...SPORT_READ_OPTIONS, signal, revalidate: 86_400 }),
-    provider.getAllConstructors({ ...SPORT_READ_OPTIONS, signal, revalidate: 86_400 }),
-  ]), { timeoutMs: SPORT_READ_OPTIONS.deadlineMs }));
+type SearchProvider = Pick<typeof jolpica, 'getDriverStandings' | 'getConstructorStandings' | 'getSchedule' | 'getAllDrivers' | 'getSeasons' | 'getAllConstructors'>;
+export interface SearchCorpus {
+  driverStandings: Awaited<ReturnType<SearchProvider['getDriverStandings']>> | null;
+  constructorStandings: Awaited<ReturnType<SearchProvider['getConstructorStandings']>> | null;
+  schedule: Awaited<ReturnType<SearchProvider['getSchedule']>> | null;
+  allDrivers: Awaited<ReturnType<SearchProvider['getAllDrivers']>> | null;
+  seasons: Awaited<ReturnType<SearchProvider['getSeasons']>> | null;
+  allConstructors: Awaited<ReturnType<SearchProvider['getAllConstructors']>> | null;
+}
+export type SearchSource = keyof SearchCorpus;
+export type SearchCorpusRead =
+  | { state: 'available' | 'partial'; data: SearchCorpus; missing: SearchSource[] }
+  | { state: 'unavailable'; reason?: UnavailableReason };
+
+/**
+ * The six public search sources, each read on its own (strict, with its own
+ * deadline and one retry). A source that stays unavailable is `null` and named
+ * in `missing`, never an empty list, so the page can say which records the
+ * search lacks instead of claiming "no matches". Only when all six fail is
+ * search unavailable (audit 2026-11-01 VI-01: one failed read of six blanked
+ * the whole page).
+ */
+export async function readSearchCorpus(provider: SearchProvider = jolpica, retry: RetryOptions = {}): Promise<SearchCorpusRead> {
+  const source = <T,>(op: (signal: AbortSignal) => Promise<T>) => retryUnavailable(
+    () => readPublicSport(() => withProviderDeadline('jolpica', op, { timeoutMs: SPORT_READ_OPTIONS.deadlineMs })),
+    { attempts: 2, delayMs: 500, ...retry },
+  );
+  const reads = await Promise.all([
+    source(signal => provider.getDriverStandings('current', { ...SPORT_READ_OPTIONS, signal, revalidate: 1800 })),
+    source(signal => provider.getConstructorStandings('current', { ...SPORT_READ_OPTIONS, signal, revalidate: 1800 })),
+    source(signal => provider.getSchedule('current', { ...SPORT_READ_OPTIONS, signal, revalidate: 3600 })),
+    source(signal => provider.getAllDrivers({ ...SPORT_READ_OPTIONS, signal, revalidate: 86_400 })),
+    source(signal => provider.getSeasons({ ...SPORT_READ_OPTIONS, signal, revalidate: 86_400 })),
+    source(signal => provider.getAllConstructors({ ...SPORT_READ_OPTIONS, signal, revalidate: 86_400 })),
+  ] as const);
+  const [driverStandings, constructorStandings, schedule, allDrivers, seasons, allConstructors] = reads;
+  const value = <T,>(read: PublicRead<T>) => (read.state === 'available' ? read.data : null);
+  const data: SearchCorpus = {
+    driverStandings: value(driverStandings), constructorStandings: value(constructorStandings), schedule: value(schedule),
+    allDrivers: value(allDrivers), seasons: value(seasons), allConstructors: value(allConstructors),
+  };
+  const missing = (Object.keys(data) as SearchSource[]).filter(key => data[key] === null);
+  if (missing.length === reads.length) {
+    const first = reads.find(read => read.state === 'unavailable');
+    return { state: 'unavailable', reason: first?.state === 'unavailable' ? first.reason : 'provider' };
+  }
+  return { state: missing.length ? 'partial' : 'available', data, missing };
 }
 
 /**
