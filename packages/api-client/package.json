@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@apex/types": "workspace:*",
-    "fast-xml-parser": "^5.10.1"
+    "fast-xml-parser": "^5.11.2"
   },
   "devDependencies": {
     "@types/node": "^26.2.0"
