@@ -20,9 +20,9 @@
     "qa:gate:quick": "pnpm --filter @apex/web qa:gate:quick"
   },
   "devDependencies": {
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
-    "turbo": "^2.10.9",
+    "turbo": "^2.11.10",
     "typescript": "^6.0.3"
   },
   "pnpm": {
