@@ -21,7 +21,7 @@
   "dependencies": {
     "@apex/types": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.5"
+    "postgres": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
