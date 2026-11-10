@@ -7,3 +7,6 @@ node_modules/
 .vercel
 tests/quality-gate/.reports/
 next-env.d.ts
+.open-next/
+.wrangler/
+.dev.vars*

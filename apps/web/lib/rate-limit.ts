@@ -77,6 +77,11 @@ export function clientIp(req: Request): string {
     const ip = req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
     if (ip && ip.length <= 45 && /^[0-9a-fA-F:.]+$/.test(ip)) return ip;
   }
+  // Cloudflare Workers (apex.snappycrew.com): the edge sets CF-Connecting-IP and a client cannot override it.
+  if (process.env.APEX_HOST === "cloudflare") {
+    const ip = req.headers.get("cf-connecting-ip")?.trim();
+    if (ip && ip.length <= 45 && /^[0-9a-fA-F:.]+$/.test(ip)) return ip;
+  }
   return "unattributed";
 }
 

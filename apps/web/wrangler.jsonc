@@ -1,0 +1,30 @@
+// Apex on Cloudflare Workers (Next.js via OpenNext). Live: https://apex.snappycrew.com
+// Build + deploy from apps/web: pnpm cf:deploy (notes: CLOUDFLARE.md at the repo root).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "apex-f1",
+  "main": "cf-worker.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "apex-f1" }],
+  // ISR + data cache: Cache API + static assets (open-next.config.ts). No KV: the Free plan allows
+  // 1,000 KV writes a day for the whole account and snappycrew.com needs them. No tag cache (D1
+  // database apex-tag-cache exists but is unused: 50-subrequest limit per request on the Free plan).
+  "durable_objects": { "bindings": [{ "name": "NEXT_CACHE_DO_QUEUE", "class_name": "DOQueueHandler" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DOQueueHandler"] }],
+  // Were the Vercel crons in vercel.json (cf-worker.ts maps each schedule to its /api/cron route).
+  // The other refreshes (news, weather, weekend, videos, season) still run from GitHub Actions.
+  "triggers": { "crons": ["0 3 * * *", "0 4 * * *", "0 6 * * 5"] },
+  "routes": [{ "pattern": "apex.snappycrew.com", "custom_domain": true }],
+  "vars": {
+    "NEXT_PUBLIC_SITE_URL": "https://apex.snappycrew.com",
+    // production Redis key scope (packages/api-client/src/redis-scope.ts) without VERCEL_ENV
+    "APEX_ENV": "production",
+    // lib/rate-limit.ts trusts CF-Connecting-IP only when this is set
+    "APEX_HOST": "cloudflare"
+  },
+  "observability": { "enabled": true },
+  "workers_dev": true,
+  "preview_urls": false
+}

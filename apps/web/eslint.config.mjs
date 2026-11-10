@@ -26,7 +26,7 @@ import nextTypescript from 'eslint-config-next/typescript';
  */
 const eslintConfig = [
   {
-    ignores: ['.next/**', '.next-*/**', 'node_modules/**', 'next-env.d.ts'],
+    ignores: ['.next/**', '.next-*/**', '.open-next/**', '.wrangler/**', 'node_modules/**', 'next-env.d.ts'],
   },
   ...coreWebVitals,
   ...nextTypescript,

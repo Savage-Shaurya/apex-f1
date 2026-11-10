@@ -30,5 +30,5 @@
     "jsx": "preserve"
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", ".next"]
+  "exclude": ["node_modules", ".next", ".open-next", ".wrangler", "cf-worker.ts", "cf-fetch-shim.ts", "open-next.config.ts"]
 }
